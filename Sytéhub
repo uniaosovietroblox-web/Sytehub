@@ -10,7 +10,7 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
 -- CONFIGURAÇÕES PRINCIPAIS
-local URL_DA_LOGO = "https://raw.githubusercontent.com/SEU_USUARIO/SEU_REPO/main/logo.png"
+local URL_DA_LOGO = "https://github.com/uniaosovietroblox-web/teste-/blob/main/Picsart_26-08-14_18-49-50-140.jpg"
 local ARQUIVO_DADOS = "SyteHub_SaveData.json"
 local PROFUNDIDADE_VOID = 160 -- Distância subterrânea
 local VELOCIDADE_DESLIZE = 90 -- Velocidade de deslizamento
