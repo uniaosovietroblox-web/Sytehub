@@ -150,10 +150,10 @@ Instance.new("UICorner", Logo).CornerRadius = UDim.new(1, 0)
 task.spawn(function()
     if writefile and getcustomasset then
         pcall(function()
-            if not isfile("SyteLogoCache.png") then
-                writefile("SyteLogoCache.png", game:HttpGet(URL_DA_LOGO))
+            if not isfile("Picsart_26-08-14_18-49-50-140.jpg") then
+                writefile("Picsart_26-08-14_18-49-50-140.jpg", game:HttpGet(https://raw.githubusercontent.com/uniaosovietroblox-web/Sytehub/main/Picsart_26-08-14_18-49-50-140.jpg))
             end
-            Logo.Image = getcustomasset("SyteLogoCache.png")
+            Logo.Image = getcustomasset("Picsart_26-08-14_18-49-50-140.jpg")
         end)
     end
 end)
