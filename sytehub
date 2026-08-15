@@ -151,7 +151,7 @@ task.spawn(function()
     if writefile and getcustomasset then
         pcall(function()
             if not isfile("Picsart_26-08-14_18-49-50-140.jpg") then
-                writefile("Picsart_26-08-14_18-49-50-140.jpg", game:HttpGet(https://raw.githubusercontent.com/uniaosovietroblox-web/Sytehub/main/Picsart_26-08-14_18-49-50-140.jpg))
+                writefile("Picsart_26-08-14_18-49-50-140.jpg", game:HttpGet("https://raw.githubusercontent.com/uniaosovietroblox-web/Sytehub/main/Picsart_26-08-14_18-49-50-140.jpg"))
             end
             Logo.Image = getcustomasset("Picsart_26-08-14_18-49-50-140.jpg")
         end)
