@@ -1,19 +1,16 @@
 -- ==========================================================
--- Syté Hub V5 (ULTIMATE) - Auto-Save, Noclip & Anti-Admin
--- Compatível com Delta Mobile e Executores Mobile
+-- Syté Hub V6 (Safe Instant Edition)
+-- Auto-Save, Anti-Rubberband & Instant Micro-Bypass
 -- ==========================================================
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
-local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
 -- CONFIGURAÇÕES PRINCIPAIS
-local URL_DA_LOGO = "https://github.com/uniaosovietroblox-web/Sytehub/blob/main/Picsart_26-08-14_18-49-50-140.jpg"
+local URL_DA_LOGO = "https://raw.githubusercontent.com/uniaosovietroblox-web/Sytehub/main/Picsart_26-08-14_18-49-50-140.jpg"
 local ARQUIVO_DADOS = "SyteHub_SaveData.json"
-local PROFUNDIDADE_VOID = 160 -- Distância subterrânea
-local VELOCIDADE_DESLIZE = 90 -- Velocidade de deslizamento
 
 -- SISTEMA DE PERSISTÊNCIA (AUTO-SAVE EM JSON)
 local DadosSalvos = {
@@ -79,7 +76,7 @@ local LoadingText = Instance.new("TextLabel")
 LoadingText.Size = UDim2.new(1, 0, 0, 50)
 LoadingText.Position = UDim2.new(0, 0, 0.5, -25)
 LoadingText.BackgroundTransparency = 1
-LoadingText.Text = "🌀 Teleportando via Subterrâneo (Syté Hub)..."
+LoadingText.Text = "⚡ Teleportando (Syté Hub)..."
 LoadingText.TextColor3 = Color3.fromRGB(255, 255, 255)
 LoadingText.TextSize = 18
 LoadingText.Font = Enum.Font.GothamBold
@@ -89,28 +86,9 @@ LoadingText.Parent = BlackScreen
 
 local function AlternarTelaEscura(ativar)
     local transp = ativar and 0 or 1
-    TweenService:Create(BlackScreen, TweenInfo.new(0.4), {BackgroundTransparency = transp}):Play()
-    TweenService:Create(LoadingText, TweenInfo.new(0.4), {TextTransparency = transp}):Play()
-    task.wait(0.4)
-end
-
--- NOCLIP AUTOMÁTICO
-local noclipConexao
-local function AtivarNoclip()
-    noclipConexao = RunService.Stepped:Connect(function()
-        if LocalPlayer.Character then
-            for _, v in ipairs(LocalPlayer.Character:GetDescendants()) do
-                if v:IsA("BasePart") then v.CanCollide = false end
-            end
-        end
-    end)
-end
-
-local function DesativarNoclip()
-    if noclipConexao then
-        noclipConexao:Disconnect()
-        noclipConexao = nil
-    end
+    TweenService:Create(BlackScreen, TweenInfo.new(0.25), {BackgroundTransparency = transp}):Play()
+    TweenService:Create(LoadingText, TweenInfo.new(0.25), {TextTransparency = transp}):Play()
+    task.wait(0.25)
 end
 
 -- VERIFICADOR DE ADMINS / ESP
@@ -184,7 +162,7 @@ local Titulo = Instance.new("TextLabel")
 Titulo.Size = UDim2.new(0, 150, 1, 0)
 Titulo.Position = UDim2.new(0, 50, 0, 0)
 Titulo.BackgroundTransparency = 1
-Titulo.Text = "Syté Hub V5"
+Titulo.Text = "Syté Hub V6"
 Titulo.TextColor3 = Color3.fromRGB(255, 255, 255)
 Titulo.TextSize = 18
 Titulo.Font = Enum.Font.GothamBold
@@ -215,8 +193,8 @@ BotaoMin.MouseButton1Click:Connect(function() MainFrame.Visible = false; OpenBtn
 OpenBtn.MouseButton1Click:Connect(function() MainFrame.Visible = true; OpenBtn.Visible = false end)
 BotaoFechar.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
 
--- ROTA DE TELEPORTE SEGURA
-local function TeleportarSubterraneo(destinoCFrame, btnRef)
+-- TELEPORTE INSTANTÂNEO SEGURO (MICRO-BYPASS)
+local function TeleportarInstantaneoSeguro(destinoCFrame, btnRef)
     if DetectarAdmins() then
         btnRef.Text = "⚠️ RISCO"
         btnRef.BackgroundColor3 = Color3.fromRGB(220, 100, 0)
@@ -228,30 +206,47 @@ local function TeleportarSubterraneo(destinoCFrame, btnRef)
 
     local character = LocalPlayer.Character
     if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    
     local hrp = character.HumanoidRootPart
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
 
+    -- 1. Ativa a mascara de tela
     AlternarTelaEscura(true)
-    AtivarNoclip()
 
-    local posAtual = hrp.Position
-    local posDestino = destinoCFrame.Position
+    -- 2. Elevação de segurança (+2.5 studs) para evitar engatar no mapa
+    local cframeComOffset = destinoCFrame + Vector3.new(0, 2.5, 0)
 
-    local pBaixoAtual = CFrame.new(posAtual.X, posAtual.Y - PROFUNDIDADE_VOID, posAtual.Z)
-    local pBaixoDestino = CFrame.new(posDestino.X, posAtual.Y - PROFUNDIDADE_VOID, posDestino.Z)
+    -- 3. Limpeza de velocidade acumulada e congelamento momentâneo
+    hrp.AssemblyLinearVelocity = Vector3.zero
+    hrp.AssemblyAngularVelocity = Vector3.zero
+    hrp.Anchored = true
 
-    TweenService:Create(hrp, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {CFrame = pBaixoAtual}):Play()
-    task.wait(0.5)
+    -- Desativa colisões temporárias do corpo durante a troca de coordenadas
+    for _, part in ipairs(character:GetChildren()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = false
+        end
+    end
 
-    local dist = (pBaixoAtual.Position - pBaixoDestino.Position).Magnitude
-    local tempo = dist / VELOCIDADE_DESLIZE
-    local tweenAcc = TweenService:Create(hrp, TweenInfo.new(tempo, Enum.EasingStyle.Linear), {CFrame = pBaixoDestino})
-    tweenAcc:Play()
-    tweenAcc.Completed:Wait()
+    task.wait(0.05)
 
-    TweenService:Create(hrp, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {CFrame = destinoCFrame}):Play()
-    task.wait(0.5)
+    -- 4. Mudança imediata de posição
+    character:PivotTo(cframeComOffset)
 
-    DesativarNoclip()
+    task.wait(0.05)
+
+    -- 5. Restaura a física limpa do personagem
+    hrp.Anchored = false
+    hrp.AssemblyLinearVelocity = Vector3.zero
+    hrp.AssemblyAngularVelocity = Vector3.zero
+    
+    if humanoid then
+        humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+    end
+
+    task.wait(0.1)
+
+    -- 6. Remove a tela preta
     AlternarTelaEscura(false)
 end
 
@@ -331,7 +326,7 @@ local function CriarSlot(chaveSlot, posicaoY)
     BotaoTeleporte.MouseButton1Click:Connect(function()
         local pos = DadosSalvos.Slots[chaveSlot].CFrame
         if pos then
-            TeleportarSubterraneo(pos, BotaoTeleporte)
+            TeleportarInstantaneoSeguro(pos, BotaoTeleporte)
         else
             BotaoTeleporte.Text = "Vazio!"
             task.wait(1)
