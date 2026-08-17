@@ -1191,28 +1191,28 @@ MusicTab:CreateButton({
     end,
 })
 
--- ========== ABA 4: COMBATE (AIMBOT MELHORADO) ==========
+-- ========== ABA 4: COMBATE (AIMBOT PROFISSIONAL) ==========
 local CombatTab = Window:CreateTab("⚔️ Combate", 4483362458)
-CombatTab:CreateSection("Aimbot Profissional")
+CombatTab:CreateSection("Aimbot")
 
 local aimbot = {
     enabled = false,
     smoothness = 0.25,
     fov = 120,
     range = 300,
-    targetPart = "Tronco", -- "Cabeça" ou "Tronco"
-    silent = false,
+    target = "Torso", -- "Torso" ou "Head"
     wallCheck = false,
     teamCheck = true,
+    silent = false,
+    prediction = false,
+    predictionAmount = 0.2,
     showFOV = false,
-    prediction = false, -- mira à frente (lead)
-    predictionAmount = 0.2, -- fator de predição
 }
 
 local aimbotConn = nil
 local fovCircle = nil
 
--- Verificar time
+-- ===== VERIFICA TIME =====
 local function isEnemy(target)
     if not aimbot.teamCheck then return true end
     local myTeam = player.Team
@@ -1223,7 +1223,7 @@ local function isEnemy(target)
     return true
 end
 
--- Wall check
+-- ===== WALL CHECK =====
 local function canSee(targetPos)
     if not aimbot.wallCheck then return true end
     local cam = Workspace.CurrentCamera
@@ -1237,7 +1237,7 @@ local function canSee(targetPos)
     return true
 end
 
--- Obter alvo mais próximo com pontuação
+-- ===== OBTEM O ALVO =====
 local function getClosestTarget()
     local cam = Workspace.CurrentCamera
     if not cam then return nil end
@@ -1250,17 +1250,20 @@ local function getClosestTarget()
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
             if not isEnemy(plr) then continue end
+            
             local root = plr.Character.HumanoidRootPart
             local head = plr.Character:FindFirstChild("Head")
             local targetPos
-            if aimbot.targetPart == "Cabeça" and head then
-                targetPos = head.Position - Vector3.new(0, 1.5, 0) -- offset para o centro do tronco
+            
+            if aimbot.target == "Head" and head then
+                targetPos = head.Position - Vector3.new(0, 1.5, 0) -- offset padrão para centralizar
             else
                 targetPos = root.Position
             end
+            
             if not targetPos then continue end
 
-            -- Predição (lead) para alvos em movimento
+            -- Predição
             if aimbot.prediction then
                 local vel = root.AssemblyLinearVelocity
                 if vel.Magnitude > 1 then
@@ -1271,6 +1274,7 @@ local function getClosestTarget()
             local dist = (targetPos - myPos.Position).Magnitude
             if dist > aimbot.range then continue end
             if not canSee(targetPos) then continue end
+            
             local screenPos, onScreen = cam:WorldToScreenPoint(targetPos)
             if onScreen then
                 local fovDist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
@@ -1287,7 +1291,7 @@ local function getClosestTarget()
     return closest
 end
 
--- Iniciar aimbot (com suavidade melhorada)
+-- ===== INICIA O AIMBOT =====
 local function startAimbot()
     if aimbotConn then aimbotConn:Disconnect(); aimbotConn = nil end
     if not aimbot.enabled then return end
@@ -1298,13 +1302,12 @@ local function startAimbot()
             local cam = Workspace.CurrentCamera
             local targetPos = target.Position
             local newCF = CFrame.new(cam.CFrame.Position, targetPos)
-            -- Suavidade via lerp com fator de suavidade
             cam.CFrame = cam.CFrame:Lerp(newCF, aimbot.smoothness)
         end
     end)
 end
 
--- Interface do Rayfield
+-- ===== INTERFACE =====
 CombatTab:CreateToggle({
     Name = "Aimbot Ativo",
     CurrentValue = false,
@@ -1343,9 +1346,9 @@ CombatTab:CreateSlider({
 
 CombatTab:CreateDropdown({
     Name = "Alvo",
-    Options = {"Cabeça", "Tronco"},
-    CurrentOption = "Tronco",
-    Callback = function(opt) aimbot.targetPart = opt end,
+    Options = {"Torso", "Cabeça"},
+    CurrentOption = "Torso",
+    Callback = function(opt) aimbot.target = opt end,
 })
 
 CombatTab:CreateToggle({
@@ -1403,6 +1406,7 @@ CombatTab:CreateToggle({
     end,
 })
 
+-- Atualiza o círculo de FOV
 RunService.RenderStepped:Connect(function()
     if aimbot.showFOV and fovCircle then
         local cam = Workspace.CurrentCamera
@@ -1414,6 +1418,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+-- ===== WALL HACK =====
 CombatTab:CreateSection("Wall Hack")
 local wallhackActive = false
 local wallhackESP = {}
