@@ -1570,7 +1570,7 @@ CombatTab:CreateToggle({
     end,
 })
 
--- ===== CROSSHAIR & SILENT AIM (CORRIGIDO) =====
+-- ===== CROSSHAIR & SILENT AIM (FUNCIONAL) =====
 CombatTab:CreateSection("Crosshair & Silent Aim")
 
 local crosshair = {
@@ -1728,11 +1728,11 @@ local function updateCrosshair()
     end
 end
 
--- ===== DETECTA ALVO SOB O CROSSHAIR (CORRIGIDO) =====
+-- ===== DETECTA ALVO SOB O CROSSHAIR =====
 local function getTargetUnderCrosshair()
-    if not crosshairGui or not crosshairFrame then return nil, nil end
+    if not crosshairGui or not crosshairFrame then return nil end
     local cam = Workspace.CurrentCamera
-    if not cam then return nil, nil end
+    if not cam then return nil end
     
     local viewportSize = cam.ViewportSize
     local crosshairPos = Vector2.new(
@@ -1742,118 +1742,103 @@ local function getTargetUnderCrosshair()
     
     local closest = nil
     local closestDist = math.huge
-    local closestPart = nil
     local myPos = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    if not myPos then return nil, nil end
+    if not myPos then return nil end
 
     for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= player and plr.Character then
+        if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
             if not isEnemy(plr) then continue end
-            
-            local root = plr.Character:FindFirstChild("HumanoidRootPart")
+            local root = plr.Character.HumanoidRootPart
             local head = plr.Character:FindFirstChild("Head")
-            if not root then continue end
+            local targetPos = root.Position
             
-            -- Verifica vários pontos do personagem para melhor detecção
-            local checkPoints = {}
-            if head then table.insert(checkPoints, head) end
-            table.insert(checkPoints, root)
-            if plr.Character:FindFirstChild("UpperTorso") then 
-                table.insert(checkPoints, plr.Character.UpperTorso)
+            -- Usa o mesmo offset do aimbot para consistência
+            local offset
+            if aimbot.useAutoOffset then
+                offset = getAutoOffset()
+            else
+                offset = Vector3.new(aimbot.offsetX, aimbot.offsetY, aimbot.offsetZ)
             end
-            if plr.Character:FindFirstChild("LowerTorso") then 
-                table.insert(checkPoints, plr.Character.LowerTorso)
-            end
+            targetPos = targetPos + offset
             
-            for _, part in ipairs(checkPoints) do
+            -- Verifica também a cabeça e torso para melhor detecção
+            local parts = {}
+            if head then parts[#parts+1] = head end
+            parts[#parts+1] = root
+            if plr.Character:FindFirstChild("UpperTorso") then parts[#parts+1] = plr.Character.UpperTorso end
+            if plr.Character:FindFirstChild("LowerTorso") then parts[#parts+1] = plr.Character.LowerTorso end
+            
+            for _, part in ipairs(parts) do
                 if part and part:IsA("BasePart") then
-                    local targetPos = part.Position
-                    
-                    -- Aplica o offset se for cabeça (já incluído)
-                    local screenPos, onScreen = cam:WorldToScreenPoint(targetPos)
+                    local screenPos, onScreen = cam:WorldToScreenPoint(part.Position)
                     if onScreen then
                         local dist = (Vector2.new(screenPos.X, screenPos.Y) - crosshairPos).Magnitude
                         if dist < crosshair.hitboxRadius and dist < closestDist then
                             closestDist = dist
                             closest = plr
-                            closestPart = part
                         end
                     end
                 end
             end
         end
     end
-    return closest, closestPart
+    return closest
 end
 
--- ===== APLICA DANO AO ALVO (MELHORADO) =====
-local function applyDamageToTarget(target, part)
-    if not target or not target.Character then return false end
+-- ===== APLICA DANO AO ALVO (GARANTIDO) =====
+local function applyDamageToTarget(target)
+    if not target or not target.Character then return end
     local targetHumanoid = target.Character:FindFirstChild("Humanoid")
-    if not targetHumanoid then return false end
+    if not targetHumanoid then return end
     
     local char = player.Character
-    if not char then return false end
+    if not char then return end
     
-    -- Tenta aplicar dano de várias formas
-    local success = false
-    
-    -- 1. Tenta usar a ferramenta equipada
+    -- MÉTODO 1: Tenta usar a ferramenta equipada
     local tool = char:FindFirstChildOfClass("Tool")
     if tool then
-        -- Simula o clique da ferramenta
+        -- Tenta ativar a ferramenta (simula o clique)
         pcall(function()
-            if tool:FindFirstChild("Handle") then
-                local handle = tool.Handle
-                -- Tenta eventos comuns
-                if handle:FindFirstChild("RemoteEvent") then
-                    handle.RemoteEvent:FireServer(targetHumanoid, part or targetHumanoid)
-                    success = true
-                end
-                if handle:FindFirstChild("RemoteFunction") then
-                    handle.RemoteFunction:InvokeServer(targetHumanoid, part or targetHumanoid)
-                    success = true
-                end
-            end
-            if tool:FindFirstChild("RemoteEvent") then
-                tool.RemoteEvent:FireServer(targetHumanoid, part or targetHumanoid)
-                success = true
-            end
-            if tool:FindFirstChild("RemoteFunction") then
-                tool.RemoteFunction:InvokeServer(targetHumanoid, part or targetHumanoid)
-                success = true
-            end
-            -- Ativa a ferramenta
             if tool.Activated then
                 tool:Activated()
-                success = true
+            end
+        end)
+        -- Tenta enviar RemoteEvent se existir
+        pcall(function()
+            if tool:FindFirstChild("RemoteEvent") then
+                tool.RemoteEvent:FireServer(targetHumanoid)
+            end
+            if tool:FindFirstChild("Handle") and tool.Handle:FindFirstChild("RemoteEvent") then
+                tool.Handle.RemoteEvent:FireServer(targetHumanoid)
             end
         end)
     end
     
-    -- 2. Se não tiver ferramenta ou falhou, tenta dano direto
-    if not success then
-        pcall(function()
-            targetHumanoid:TakeDamage(crosshair.damageAmount)
-            success = true
-        end)
-    end
+    -- MÉTODO 2: Dano direto no Humanoid (funciona na maioria dos jogos)
+    pcall(function()
+        targetHumanoid:TakeDamage(crosshair.damageAmount)
+        print("💥 Dano aplicado em " .. target.Name .. " (" .. crosshair.damageAmount .. ")")
+    end)
     
-    -- 3. Último recurso: tenta usar o mouse para atirar
-    if not success then
-        pcall(function()
-            local mouse = player:GetMouse()
-            if mouse and mouse.Button1Down then
-                mouse.Button1Down()
-                success = true
+    -- MÉTODO 3: Tenta usar o mouse para atirar (fallback)
+    pcall(function()
+        local mouse = player:GetMouse()
+        if mouse and mouse.Button1Down then
+            mouse.Button1Down()
+        end
+    end)
+    
+    -- MÉTODO 4: Tenta usar fireproximityprompt (para jogos com prompts)
+    pcall(function()
+        for _, obj in ipairs(target.Character:GetDescendants()) do
+            if obj:IsA("ProximityPrompt") then
+                fireproximityprompt(obj)
             end
-        end)
-    end
-    
-    return success
+        end
+    end)
 end
 
--- ===== INTERFACE DO CROSSHAIR =====
+-- ===== INTERFACE =====
 CombatTab:CreateToggle({
     Name = "Ativar Crosshair",
     CurrentValue = false,
@@ -1895,11 +1880,20 @@ CombatTab:CreateSlider({
     Range = {20, 150},
     Increment = 5,
     Suffix = "px",
-    CurrentValue = 40,
+    CurrentValue = 60,
     Callback = function(v)
         crosshair.hitboxRadius = v
         if crosshairGui then updateCrosshair() end
     end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Dano por Tiro",
+    Range = {5, 100},
+    Increment = 5,
+    Suffix = "",
+    CurrentValue = 20,
+    Callback = function(v) crosshair.damageAmount = v end,
 })
 
 CombatTab:CreateSlider({
@@ -1946,12 +1940,12 @@ CombatTab:CreateToggle({
     CurrentValue = false,
     Callback = function(state)
         crosshair.silentAim = state
-        print("Silent Aim (Crosshair) " .. (state and "ativado" or "desativado"))
+        print("Silent Aim " .. (state and "ativado" or "desativado"))
     end,
 })
 
 CombatTab:CreateToggle({
-    Name = "Auto Fire",
+    Name = "Auto Fire (Atira automaticamente)",
     CurrentValue = false,
     Callback = function(state)
         crosshair.autoFire = state
@@ -1959,7 +1953,7 @@ CombatTab:CreateToggle({
     end,
 })
 
--- ===== AUTO FIRE (CORRIGIDO) =====
+-- ===== AUTO FIRE =====
 local autoFireConn = nil
 
 CombatTab:CreateToggle({
@@ -1970,9 +1964,9 @@ CombatTab:CreateToggle({
             if autoFireConn then autoFireConn:Disconnect() end
             autoFireConn = RunService.Heartbeat:Connect(function()
                 if not crosshair.enabled or not crosshair.autoFire then return end
-                local target, part = getTargetUnderCrosshair()
+                local target = getTargetUnderCrosshair()
                 if target then
-                    applyDamageToTarget(target, part)
+                    applyDamageToTarget(target)
                 end
             end)
             print("✅ Auto Fire contínuo ativado")
@@ -1983,7 +1977,7 @@ CombatTab:CreateToggle({
     end,
 })
 
--- ===== SILENT AIM (CORRIGIDO - INTERCEPTA O CLIQUE E REDIRECIONA) =====
+-- ===== SILENT AIM (INTERCEPTA O CLIQUE) =====
 local originalMouseButton1Down = nil
 local silentAimConn = nil
 
@@ -1999,16 +1993,15 @@ local function setupSilentAim()
         if gameProcessed then return end
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             if crosshair.enabled and crosshair.silentAim then
-                local target, part = getTargetUnderCrosshair()
+                local target = getTargetUnderCrosshair()
                 if target then
                     print("🎯 Silent Aim: alvo encontrado - " .. target.Name)
-                    applyDamageToTarget(target, part)
-                    return -- Impede o clique normal
+                    applyDamageToTarget(target)
+                    return -- Bloqueia o clique normal
                 else
                     print("Silent Aim: nenhum alvo sob o crosshair")
                 end
             end
-            -- Se não estiver ativo ou não houver alvo, executa o clique normal
             if originalMouseButton1Down then
                 originalMouseButton1Down(input)
             end
@@ -2026,21 +2019,20 @@ pcall(function()
     _G.Syte_SilentAimConn = silentAimConn
 end)
 
--- ===== BOTÃO DE TESTE (OPCIONAL) =====
-CombatTab:CreateSection("Teste")
+-- ===== BOTÃO DE TESTE =====
+CombatTab:CreateSection("Diagnóstico")
 CombatTab:CreateButton({
-    Name = "🔍 Testar Detecção",
+    Name = "🔍 Testar Detecção e Dano",
     Callback = function()
-        local target, part = getTargetUnderCrosshair()
+        local target = getTargetUnderCrosshair()
         if target then
-            print("✅ Alvo detectado: " .. target.Name .. " | Parte: " .. (part and part.Name or "desconhecida"))
-            applyDamageToTarget(target, part)
+            print("✅ Alvo detectado: " .. target.Name)
+            applyDamageToTarget(target)
         else
             print("❌ Nenhum alvo sob o crosshair")
         end
     end,
 })
-
 -- ========== NOVA ABA: NOCLIP (COM MINI-HUB) ==========
 local NoClipTab = Window:CreateTab("🎮 NoClip", 4483362458)
 NoClipTab:CreateSection("Mini-Hub Flutuante")
