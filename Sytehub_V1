@@ -1570,115 +1570,96 @@ CombatTab:CreateToggle({
     end,
 })
 
--- ===== CROSSHAIR (AIMBOT COM MIRA MÓVEL) =====
-CombatTab:CreateSection("Crosshair Móvel (Aimbot)")
+-- ===== CALIBRAGEM DA MIRA (AJUSTE VISUAL) =====
+CombatTab:CreateSection("Calibragem da Mira")
 
-local crosshair = {
-    enabled = false,
+-- Posição da mira em porcentagem da tela (padrão: centro)
+local aimPosition = {
     x = 0.5,
-    y = 0.5,
-    size = 20,
-    color = Color3.fromRGB(255, 0, 0),
-    thickness = 2,
-    hitboxRadius = 50,
-    silentAim = false,
-    autoFire = false,
-    showHitbox = false,
-    damageAmount = 20,
+    y = 0.42, -- 0.42 = um pouco acima do centro (padrão para a maioria dos FPS mobile)
+    useCalibrated = false,
 }
 
-local crosshairGui = nil
-local crosshairFrame = nil
-local hitboxCircle = nil
-local isDraggingCrosshair = false
+local calibrationGui = nil
+local calibrationDot = nil
+local isDragging = false
+local calibrationMode = false
 
--- ===== CRIA O CROSSHAIR (MIRA MÓVEL) =====
-local function createCrosshair()
-    if crosshairGui then crosshairGui:Destroy() end
+-- ===== CRIA O PONTO DE CALIBRAÇÃO =====
+local function createCalibrationDot()
+    if calibrationGui then calibrationGui:Destroy() end
     
-    crosshairGui = Instance.new("ScreenGui")
-    crosshairGui.Name = "Syte_Crosshair"
-    crosshairGui.ResetOnSpawn = false
-    crosshairGui.IgnoreGuiInset = true
-    crosshairGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    calibrationGui = Instance.new("ScreenGui")
+    calibrationGui.Name = "Syte_Calibration"
+    calibrationGui.ResetOnSpawn = false
+    calibrationGui.IgnoreGuiInset = true
+    calibrationGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     pcall(function()
         if gethui then
-            crosshairGui.Parent = gethui()
+            calibrationGui.Parent = gethui()
         else
-            crosshairGui.Parent = CoreGui
+            calibrationGui.Parent = CoreGui
         end
     end)
-    if not crosshairGui.Parent then
-        crosshairGui.Parent = player:WaitForChild("PlayerGui")
+    if not calibrationGui.Parent then
+        calibrationGui.Parent = player:WaitForChild("PlayerGui")
     end
-    crosshairGui.Enabled = false
+    calibrationGui.Enabled = false
 
-    crosshairFrame = Instance.new("Frame")
-    crosshairFrame.Size = UDim2.new(0, 60, 0, 60)
-    crosshairFrame.Position = UDim2.new(crosshair.x - 0.03, 0, crosshair.y - 0.03, 0)
-    crosshairFrame.BackgroundTransparency = 1
-    crosshairFrame.Parent = crosshairGui
-    crosshairFrame.Active = true
-    crosshairFrame.Draggable = false
-    crosshairFrame.ZIndex = 10
+    calibrationDot = Instance.new("Frame")
+    calibrationDot.Size = UDim2.new(0, 24, 0, 24)
+    calibrationDot.Position = UDim2.new(aimPosition.x - 0.012, 0, aimPosition.y - 0.012, 0)
+    calibrationDot.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    calibrationDot.BorderSizePixel = 2
+    calibrationDot.BorderColor3 = Color3.fromRGB(255, 255, 255)
+    calibrationDot.BackgroundTransparency = 0.2
+    calibrationDot.Parent = calibrationGui
+    calibrationDot.ZIndex = 100
+    Instance.new("UICorner", calibrationDot).CornerRadius = UDim.new(0, 12)
+    calibrationDot.Active = true
+    calibrationDot.Draggable = false
 
-    local hLine = Instance.new("Frame")
-    hLine.Size = UDim2.new(0, crosshair.size, 0, crosshair.thickness)
-    hLine.Position = UDim2.new(0.5, -crosshair.size/2, 0.5, -crosshair.thickness/2)
-    hLine.BackgroundColor3 = crosshair.color
-    hLine.BorderSizePixel = 0
-    hLine.BackgroundTransparency = 0.2
-    hLine.Parent = crosshairFrame
-    hLine.ZIndex = 11
+    -- Círculo externo
+    local outerCircle = Instance.new("Frame")
+    outerCircle.Size = UDim2.new(0, 44, 0, 44)
+    outerCircle.Position = UDim2.new(0.5, -22, 0.5, -22)
+    outerCircle.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    outerCircle.BackgroundTransparency = 0.85
+    outerCircle.BorderSizePixel = 1
+    outerCircle.BorderColor3 = Color3.fromRGB(255, 0, 0)
+    outerCircle.Parent = calibrationDot
+    Instance.new("UICorner", outerCircle).CornerRadius = UDim.new(0, 22)
 
-    local vLine = Instance.new("Frame")
-    vLine.Size = UDim2.new(0, crosshair.thickness, 0, crosshair.size)
-    vLine.Position = UDim2.new(0.5, -crosshair.thickness/2, 0.5, -crosshair.size/2)
-    vLine.BackgroundColor3 = crosshair.color
-    vLine.BorderSizePixel = 0
-    vLine.BackgroundTransparency = 0.2
-    vLine.Parent = crosshairFrame
-    vLine.ZIndex = 11
+    -- Label
+    local instruction = Instance.new("TextLabel")
+    instruction.Size = UDim2.new(0, 260, 0, 30)
+    instruction.Position = UDim2.new(0.5, -130, 1, 10)
+    instruction.BackgroundTransparency = 1
+    instruction.Text = "Arraste o ponto para a MIRA DO JOGO"
+    instruction.TextColor3 = Color3.fromRGB(255, 255, 255)
+    instruction.TextSize = 14
+    instruction.Font = Enum.Font.GothamBold
+    instruction.TextStrokeTransparency = 0.2
+    instruction.Parent = calibrationDot
 
-    local dot = Instance.new("Frame")
-    dot.Size = UDim2.new(0, 4, 0, 4)
-    dot.Position = UDim2.new(0.5, -2, 0.5, -2)
-    dot.BackgroundColor3 = crosshair.color
-    dot.BorderSizePixel = 0
-    dot.BackgroundTransparency = 0.3
-    dot.Parent = crosshairFrame
-    dot.ZIndex = 12
-    Instance.new("UICorner", dot).CornerRadius = UDim.new(0, 2)
-
-    hitboxCircle = Instance.new("Frame")
-    hitboxCircle.Size = UDim2.new(0, crosshair.hitboxRadius * 2, 0, crosshair.hitboxRadius * 2)
-    hitboxCircle.Position = UDim2.new(0.5, -crosshair.hitboxRadius, 0.5, -crosshair.hitboxRadius)
-    hitboxCircle.BackgroundColor3 = crosshair.color
-    hitboxCircle.BackgroundTransparency = 0.85
-    hitboxCircle.BorderSizePixel = 1
-    hitboxCircle.BorderColor3 = crosshair.color
-    hitboxCircle.Parent = crosshairFrame
-    hitboxCircle.ZIndex = 9
-    Instance.new("UICorner", hitboxCircle).CornerRadius = UDim.new(0, crosshair.hitboxRadius)
-    hitboxCircle.Visible = crosshair.showHitbox
-
+    -- Arrasto com TOQUE e MOUSE
     local function startDrag(input)
-        isDraggingCrosshair = true
+        isDragging = true
         local startPos = input.Position
-        local framePos = crosshairFrame.Position
+        local framePos = calibrationDot.Position
         
         local dragConn
         dragConn = UserInputService.InputChanged:Connect(function(input2)
             if input2.UserInputType == Enum.UserInputType.MouseMovement or input2.UserInputType == Enum.UserInputType.Touch then
-                if isDraggingCrosshair then
+                if isDragging then
                     local delta = input2.Position - startPos
-                    local newX = framePos.X.Scale + (delta.X / crosshairGui.AbsoluteSize.X)
-                    local newY = framePos.Y.Scale + (delta.Y / crosshairGui.AbsoluteSize.Y)
-                    newX = math.clamp(newX, 0, 1 - 0.06)
-                    newY = math.clamp(newY, 0, 1 - 0.06)
-                    crosshairFrame.Position = UDim2.new(newX, 0, newY, 0)
-                    crosshair.x = newX + 0.03
-                    crosshair.y = newY + 0.03
+                    local newX = framePos.X.Scale + (delta.X / calibrationGui.AbsoluteSize.X)
+                    local newY = framePos.Y.Scale + (delta.Y / calibrationGui.AbsoluteSize.Y)
+                    newX = math.clamp(newX, 0, 1 - 0.024)
+                    newY = math.clamp(newY, 0, 1 - 0.024)
+                    calibrationDot.Position = UDim2.new(newX, 0, newY, 0)
+                    aimPosition.x = newX + 0.012
+                    aimPosition.y = newY + 0.012
                 end
             end
         end)
@@ -1686,95 +1667,69 @@ local function createCrosshair()
         local endConn
         endConn = UserInputService.InputEnded:Connect(function(input2)
             if input2 == input then
-                isDraggingCrosshair = false
+                isDragging = false
                 dragConn:Disconnect()
                 endConn:Disconnect()
+                print("✅ Posição calibrada: X=" .. string.format("%.3f", aimPosition.x) .. " Y=" .. string.format("%.3f", aimPosition.y))
             end
         end)
     end
 
-    crosshairFrame.InputBegan:Connect(function(input)
+    calibrationDot.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             startDrag(input)
         end
     end)
 
-    crosshairGui.Enabled = true
+    calibrationGui.Enabled = true
 end
 
-local function updateCrosshair()
-    if not crosshairGui or not crosshairFrame then return end
-    for _, child in ipairs(crosshairFrame:GetChildren()) do
-        if child:IsA("Frame") and child ~= hitboxCircle then
-            child.BackgroundColor3 = crosshair.color
-        end
+-- ===== FUNÇÃO MODIFICADA PARA USAR A POSIÇÃO CALIBRADA =====
+local function getCalibratedAimPosition()
+    if not aimPosition.useCalibrated then
+        -- Se não estiver usando calibragem, retorna o centro
+        local cam = Workspace.CurrentCamera
+        if not cam then return Vector2.new(0, 0) end
+        return Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
     end
-    if hitboxCircle then
-        hitboxCircle.BackgroundColor3 = crosshair.color
-        hitboxCircle.BorderColor3 = crosshair.color
-        hitboxCircle.Size = UDim2.new(0, crosshair.hitboxRadius * 2, 0, crosshair.hitboxRadius * 2)
-        hitboxCircle.Position = UDim2.new(0.5, -crosshair.hitboxRadius, 0.5, -crosshair.hitboxRadius)
-        hitboxCircle.Visible = crosshair.showHitbox
-    end
-    for _, child in ipairs(crosshairFrame:GetChildren()) do
-        if child:IsA("Frame") and child ~= hitboxCircle and child.Size.X.Offset == crosshair.size then
-            child.Size = UDim2.new(0, crosshair.size, 0, crosshair.thickness)
-            child.Position = UDim2.new(0.5, -crosshair.size/2, 0.5, -crosshair.thickness/2)
-        elseif child:IsA("Frame") and child ~= hitboxCircle and child.Size.Y.Offset == crosshair.size then
-            child.Size = UDim2.new(0, crosshair.thickness, 0, crosshair.size)
-            child.Position = UDim2.new(0.5, -crosshair.thickness/2, 0.5, -crosshair.size/2)
-        end
-    end
+    local cam = Workspace.CurrentCamera
+    if not cam then return Vector2.new(0, 0) end
+    return Vector2.new(
+        aimPosition.x * cam.ViewportSize.X,
+        aimPosition.y * cam.ViewportSize.Y
+    )
 end
 
--- ===== DETECTA ALVO SOB O CROSSHAIR =====
-local function getTargetUnderCrosshair()
-    if not crosshairGui or not crosshairFrame then return nil end
+-- ===== FUNÇÃO QUE ENCONTRA O ALVO MAIS PRÓXIMO DA POSIÇÃO CALIBRADA =====
+local function getTargetNearCalibratedAim()
     local cam = Workspace.CurrentCamera
     if not cam then return nil end
-    
-    local viewportSize = cam.ViewportSize
-    local crosshairPos = Vector2.new(
-        crosshair.x * viewportSize.X,
-        crosshair.y * viewportSize.Y
-    )
-    
+    local aimPos = getCalibratedAimPosition()
     local closest = nil
     local closestDist = math.huge
     local myPos = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     if not myPos then return nil end
+
+    local offset
+    if aimbot.useAutoOffset then
+        offset = getAutoOffset()
+    else
+        offset = Vector3.new(aimbot.offsetX, aimbot.offsetY, aimbot.offsetZ)
+    end
 
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
             if not isEnemy(plr) then continue end
             local root = plr.Character.HumanoidRootPart
             local head = plr.Character:FindFirstChild("Head")
-            local targetPos = root.Position
+            local targetPos = root.Position + offset
             
-            local offset
-            if aimbot.useAutoOffset then
-                offset = getAutoOffset()
-            else
-                offset = Vector3.new(aimbot.offsetX, aimbot.offsetY, aimbot.offsetZ)
-            end
-            targetPos = targetPos + offset
-            
-            local parts = {}
-            if head then parts[#parts+1] = head end
-            parts[#parts+1] = root
-            if plr.Character:FindFirstChild("UpperTorso") then parts[#parts+1] = plr.Character.UpperTorso end
-            if plr.Character:FindFirstChild("LowerTorso") then parts[#parts+1] = plr.Character.LowerTorso end
-            
-            for _, part in ipairs(parts) do
-                if part and part:IsA("BasePart") then
-                    local screenPos, onScreen = cam:WorldToScreenPoint(part.Position)
-                    if onScreen then
-                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - crosshairPos).Magnitude
-                        if dist < crosshair.hitboxRadius and dist < closestDist then
-                            closestDist = dist
-                            closest = plr
-                        end
-                    end
+            local screenPos, onScreen = cam:WorldToScreenPoint(targetPos)
+            if onScreen then
+                local dist = (Vector2.new(screenPos.X, screenPos.Y) - aimPos).Magnitude
+                if dist < closestDist then
+                    closestDist = dist
+                    closest = { Position = targetPos, Player = plr }
                 end
             end
         end
@@ -1782,247 +1737,144 @@ local function getTargetUnderCrosshair()
     return closest
 end
 
--- ===== SIMULA UM TIRO COMPLETO =====
-local function fireShot(target)
-    if not target or not target.Character then return end
-    local targetHumanoid = target.Character:FindFirstChild("Humanoid")
-    if not targetHumanoid then return end
+-- ===== AIMBOT COM POSIÇÃO CALIBRADA =====
+local calibratedAimbotActive = false
+local calibratedAimbotConn = nil
+
+local function startCalibratedAimbot()
+    if calibratedAimbotConn then calibratedAimbotConn:Disconnect(); calibratedAimbotConn = nil end
+    if not calibratedAimbotActive then return end
     
-    local char = player.Character
-    if not char then return end
-    
-    -- 1. Simula clique do mouse (ativa animações, sons, etc.)
-    local mouse = player:GetMouse()
-    if mouse then
-        pcall(function()
-            if mouse.Button1Down then
-                mouse.Button1Down()
-            end
-        end)
-    end
-    
-    -- 2. Tenta ativar a ferramenta diretamente
-    local tool = char:FindFirstChildOfClass("Tool")
-    if tool then
-        pcall(function()
-            if tool.Activated then
-                tool:Activated()
-            end
-        end)
-    end
-    
-    -- 3. Aplica dano diretamente (para garantir)
-    pcall(function()
-        targetHumanoid:TakeDamage(crosshair.damageAmount)
+    calibratedAimbotConn = RunService.RenderStepped:Connect(function()
+        if not calibratedAimbotActive then return end
+        local target = getTargetNearCalibratedAim()
+        if target and target.Position then
+            local cam = Workspace.CurrentCamera
+            local newCF = CFrame.new(cam.CFrame.Position, target.Position)
+            cam.CFrame = cam.CFrame:Lerp(newCF, aimbot.smoothness)
+        end
     end)
-    
-    -- 4. Tenta RemoteEvents
-    if tool then
-        pcall(function()
-            if tool:FindFirstChild("RemoteEvent") then
-                tool.RemoteEvent:FireServer(targetHumanoid)
-            end
-            if tool:FindFirstChild("Handle") and tool.Handle:FindFirstChild("RemoteEvent") then
-                tool.Handle.RemoteEvent:FireServer(targetHumanoid)
-            end
-        end)
-    end
 end
 
--- ===== INTERFACE =====
+-- ===== INTERFACE DE CALIBRAGEM =====
 CombatTab:CreateToggle({
-    Name = "Ativar Crosshair",
+    Name = "🔴 Modo Calibração (Arraste o ponto)",
     CurrentValue = false,
     Callback = function(state)
-        crosshair.enabled = state
+        calibrationMode = state
         if state then
-            createCrosshair()
+            createCalibrationDot()
+            print("🔴 Modo calibração ativado. Arraste o ponto vermelho até a mira do jogo.")
         else
-            if crosshairGui then crosshairGui:Destroy(); crosshairGui = nil end
-            crosshairFrame = nil
-            hitboxCircle = nil
+            if calibrationGui then calibrationGui:Destroy(); calibrationGui = nil end
+            calibrationDot = nil
         end
     end,
 })
 
 CombatTab:CreateToggle({
-    Name = "Mostrar Hitbox Circle",
+    Name = "🎯 Usar Posição Calibrada",
     CurrentValue = false,
     Callback = function(state)
-        crosshair.showHitbox = state
-        if crosshairGui then updateCrosshair() end
-    end,
-})
-
-CombatTab:CreateSlider({
-    Name = "Tamanho do Crosshair",
-    Range = {10, 50},
-    Increment = 1,
-    Suffix = "",
-    CurrentValue = 20,
-    Callback = function(v)
-        crosshair.size = v
-        if crosshairGui then updateCrosshair() end
-    end,
-})
-
-CombatTab:CreateSlider({
-    Name = "Raio do Hitbox",
-    Range = {20, 150},
-    Increment = 5,
-    Suffix = "px",
-    CurrentValue = 60,
-    Callback = function(v)
-        crosshair.hitboxRadius = v
-        if crosshairGui then updateCrosshair() end
-    end,
-})
-
-CombatTab:CreateSlider({
-    Name = "Dano por Tiro",
-    Range = {5, 100},
-    Increment = 5,
-    Suffix = "",
-    CurrentValue = 20,
-    Callback = function(v) crosshair.damageAmount = v end,
-})
-
-CombatTab:CreateSlider({
-    Name = "Posição X do Crosshair",
-    Range = {0.05, 0.95},
-    Increment = 0.01,
-    Suffix = "",
-    CurrentValue = 0.5,
-    Callback = function(v)
-        crosshair.x = v
-        if crosshairFrame then
-            crosshairFrame.Position = UDim2.new(v - 0.03, 0, crosshair.y - 0.03, 0)
+        aimPosition.useCalibrated = state
+        if state then
+            print("✅ Aimbot usando posição calibrada: X=" .. string.format("%.3f", aimPosition.x) .. " Y=" .. string.format("%.3f", aimPosition.y))
+        else
+            print("ℹ️ Aimbot usando centro da tela")
         end
     end,
 })
 
 CombatTab:CreateSlider({
-    Name = "Posição Y do Crosshair",
-    Range = {0.05, 0.95},
-    Increment = 0.01,
+    Name = "Ajuste Fino X",
+    Range = {0.01, 0.99},
+    Increment = 0.005,
     Suffix = "",
-    CurrentValue = 0.5,
+    CurrentValue = aimPosition.x,
     Callback = function(v)
-        crosshair.y = v
-        if crosshairFrame then
-            crosshairFrame.Position = UDim2.new(crosshair.x - 0.03, 0, v - 0.03, 0)
+        aimPosition.x = v
+        if calibrationDot then
+            calibrationDot.Position = UDim2.new(v - 0.012, 0, aimPosition.y - 0.012, 0)
+        end
+        if aimPosition.useCalibrated then
+            print("🔄 Posição X atualizada: " .. string.format("%.3f", v))
+        end
+    end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Ajuste Fino Y",
+    Range = {0.01, 0.99},
+    Increment = 0.005,
+    Suffix = "",
+    CurrentValue = aimPosition.y,
+    Callback = function(v)
+        aimPosition.y = v
+        if calibrationDot then
+            calibrationDot.Position = UDim2.new(aimPosition.x - 0.012, 0, v - 0.012, 0)
+        end
+        if aimPosition.useCalibrated then
+            print("🔄 Posição Y atualizada: " .. string.format("%.3f", v))
         end
     end,
 })
 
 CombatTab:CreateButton({
-    Name = "🔄 Resetar Posição do Crosshair",
+    Name = "📌 Salvar Posição Atual",
     Callback = function()
-        crosshair.x = 0.5
-        crosshair.y = 0.5
-        if crosshairFrame then
-            crosshairFrame.Position = UDim2.new(0.47, 0, 0.47, 0)
-        end
+        print("✅ Posição salva: X=" .. string.format("%.3f", aimPosition.x) .. " Y=" .. string.format("%.3f", aimPosition.y))
+        aimPosition.useCalibrated = true
+        print("🎯 Aimbot agora usa a posição calibrada!")
     end,
 })
 
 CombatTab:CreateToggle({
-    Name = "Silent Aim (Crosshair)",
+    Name = "🎯 Aimbot na Mira Calibrada",
     CurrentValue = false,
     Callback = function(state)
-        crosshair.silentAim = state
-        print("Silent Aim " .. (state and "ativado" or "desativado"))
+        calibratedAimbotActive = state
+        if state then startCalibratedAimbot() else if calibratedAimbotConn then calibratedAimbotConn:Disconnect(); calibratedAimbotConn = nil end end
     end,
 })
+
+CombatTab:CreateSection("Silent Aim Calibrado")
+local silentAimCalibrated = false
 
 CombatTab:CreateToggle({
-    Name = "Auto Fire (Atira automaticamente)",
+    Name = "Silent Aim (Mira Calibrada)",
     CurrentValue = false,
     Callback = function(state)
-        crosshair.autoFire = state
-        print("Auto Fire " .. (state and "ativado" or "desativado"))
+        silentAimCalibrated = state
+        print("Silent Aim calibrado " .. (state and "ativado" or "desativado"))
     end,
 })
 
--- ===== AUTO FIRE =====
-local autoFireConn = nil
-
-CombatTab:CreateToggle({
-    Name = "Ativar Auto Fire Contínuo",
-    CurrentValue = false,
-    Callback = function(state)
-        if state then
-            if autoFireConn then autoFireConn:Disconnect() end
-            autoFireConn = RunService.Heartbeat:Connect(function()
-                if not crosshair.enabled or not crosshair.autoFire then return end
-                local target = getTargetUnderCrosshair()
-                if target then
-                    fireShot(target)
-                end
-            end)
-            print("✅ Auto Fire contínuo ativado")
-        else
-            if autoFireConn then autoFireConn:Disconnect(); autoFireConn = nil end
-            print("Auto Fire contínuo desativado")
-        end
-    end,
-})
-
--- ===== SILENT AIM =====
-local originalMouseButton1Down = nil
-local silentAimConn = nil
-
-local function setupSilentAim()
+local function setupSilentAimCalibrated()
     local mouse = player:GetMouse()
-    if mouse then
-        originalMouseButton1Down = mouse.Button1Down
-    end
+    if not mouse then return end
     
-    if silentAimConn then silentAimConn:Disconnect(); silentAimConn = nil end
-    
-    silentAimConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            if crosshair.enabled and crosshair.silentAim then
-                local target = getTargetUnderCrosshair()
-                if target then
-                    print("🎯 Silent Aim: alvo - " .. target.Name)
-                    fireShot(target)
-                    return
-                end
-            end
-            if originalMouseButton1Down then
-                originalMouseButton1Down(input)
+    local originalHit = mouse.Hit
+    local metatable = {}
+    metatable.__index = function(t, k)
+        if k == "Hit" and silentAimCalibrated then
+            local target = getTargetNearCalibratedAim()
+            if target and target.Position then
+                local origin = mouse.Origin.Position
+                return CFrame.new(origin, target.Position)
             end
         end
-    end)
+        return mouse[k]
+    end
+    setmetatable(mouse, metatable)
 end
 
-task.spawn(setupSilentAim)
+task.spawn(setupSilentAimCalibrated)
 
-pcall(function()
-    if _G.Syte_SilentAimConn then
-        _G.Syte_SilentAimConn:Disconnect()
-        _G.Syte_SilentAimConn = nil
-    end
-    _G.Syte_SilentAimConn = silentAimConn
-end)
-
--- ===== BOTÃO DE TESTE =====
-CombatTab:CreateSection("Diagnóstico")
-CombatTab:CreateButton({
-    Name = "🔍 Testar Detecção e Tiro",
-    Callback = function()
-        local target = getTargetUnderCrosshair()
-        if target then
-            print("✅ Alvo: " .. target.Name)
-            fireShot(target)
-        else
-            print("❌ Nenhum alvo sob o crosshair")
-        end
-    end,
+-- ===== GUIDA DE USO =====
+CombatTab:CreateParagraph({
+    Title = "📖 Como Calibrar a Mira",
+    Content = "1. Ative 'Modo Calibração'\n2. Arraste o ponto vermelho até a MIRA DO JOGO\n3. Ative 'Usar Posição Calibrada'\n4. Ative 'Aimbot na Mira Calibrada'\n\nDica: Use os sliders para ajuste fino."
 })
-
 -- ========== NOVA ABA: NOCLIP (COM MINI-HUB) ==========
 local NoClipTab = Window:CreateTab("🎮 NoClip", 4483362458)
 NoClipTab:CreateSection("Mini-Hub Flutuante")
