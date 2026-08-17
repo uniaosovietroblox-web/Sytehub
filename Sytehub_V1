@@ -961,7 +961,7 @@ task.spawn(function()
     updateUI()
 end)
 
--- ========== ABA 2: ESP ==========
+-- ========== ABA 2: ESP (COM CORES POR TIME) ==========
 local EspTab = Window:CreateTab("👁️ ESP", 4483362458)
 EspTab:CreateSection("Configurações do ESP")
 
@@ -973,7 +973,9 @@ local ESP = {
     Distance = false,
     MaxDistance = 1000,
     MaxPlayers = 10,
-    Color = Color3.fromRGB(255, 140, 0)
+    TeamColor = Color3.fromRGB(0, 255, 100),
+    EnemyColor = Color3.fromRGB(255, 50, 50),
+    ShowTeamColors = true,
 }
 
 EspTab:CreateInput({
@@ -986,12 +988,30 @@ EspTab:CreateInput({
     end,
 })
 
+EspTab:CreateToggle({
+    Name = "Cores por Time",
+    CurrentValue = true,
+    Callback = function(v) ESP.ShowTeamColors = v end,
+})
+
+EspTab:CreateColorPicker({
+    Name = "Cor dos Aliados",
+    CurrentValue = ESP.TeamColor,
+    Callback = function(v) ESP.TeamColor = v end,
+})
+
+EspTab:CreateColorPicker({
+    Name = "Cor dos Inimigos",
+    CurrentValue = ESP.EnemyColor,
+    Callback = function(v) ESP.EnemyColor = v end,
+})
+
 local ESP_LinesPool = {}
 local function GetOrCreateLine(index)
     if not ESP_LinesPool[index] then
         local line = Drawing.new("Line")
         line.Visible = false
-        line.Color = ESP.Color
+        line.Color = Color3.fromRGB(255, 140, 0)
         line.Thickness = 1
         line.Transparency = 1
         ESP_LinesPool[index] = line
@@ -1015,9 +1035,19 @@ local function ApplyESP(targetPlayer)
         local root = char:WaitForChild("HumanoidRootPart", 5)
         if not root then return end
 
+        local isEnemy = false
+        if ESP.ShowTeamColors then
+            if player.Team and targetPlayer.Team then
+                isEnemy = player.Team ~= targetPlayer.Team
+            else
+                isEnemy = true
+            end
+        end
+        local color = isEnemy and ESP.EnemyColor or ESP.TeamColor
+
         local hl = Instance.new("Highlight")
         hl.Name = "Syte_ESP_Highlight"
-        hl.FillColor = ESP.Color
+        hl.FillColor = color
         hl.OutlineColor = Color3.fromRGB(255, 255, 255)
         hl.FillTransparency = 0.5
         hl.Enabled = false
@@ -1035,7 +1065,7 @@ local function ApplyESP(targetPlayer)
         txt.Name = "InfoText"
         txt.Size = UDim2.new(1, 0, 1, 0)
         txt.BackgroundTransparency = 1
-        txt.TextColor3 = ESP.Color
+        txt.TextColor3 = color
         txt.TextSize = 13
         txt.Font = Enum.Font.SourceSansBold
         txt.Parent = bb
@@ -1107,7 +1137,15 @@ RunService.RenderStepped:Connect(function()
                         if onScreen then
                             local line = GetOrCreateLine(i)
                             line.Visible = true
-                            line.Color = ESP.Color
+                            local isEnemy = false
+                            if ESP.ShowTeamColors then
+                                if player.Team and p.Team then
+                                    isEnemy = player.Team ~= p.Team
+                                else
+                                    isEnemy = true
+                                end
+                            end
+                            line.Color = isEnemy and ESP.EnemyColor or ESP.TeamColor
                             line.From = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y)
                             line.To = Vector2.new(screenPos.X, screenPos.Y)
                         end
