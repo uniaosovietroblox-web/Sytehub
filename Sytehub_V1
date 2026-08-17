@@ -1,932 +1,1648 @@
--- ==========================================================
--- Syté Hub V6 Full Complex (Safe Instant + Full Features)
--- Auto-Save JSON, Anti-Rubberband, Micro-Bypass & Full Cheats
--- ==========================================================
-
-local TweenService = game:GetService("TweenService")
-local Players = game:GetService("Players")
-local HttpService = game:GetService("HttpService")
-local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
-
--- CONFIGURAÇÕES PRINCIPAIS
-local URL_DA_LOGO = "https://raw.githubusercontent.com/uniaosovietroblox-web/Sytehub/main/Picsart_26-08-14_18-49-50-140.jpg"
-local ARQUIVO_DADOS = "SyteHub_SaveData.json"
-
--- ESTADOS GLOBAIS DAS FUNÇÕES
-local AimbotAtivo = false
-local AimbotFOV = 180
-local FlyAtivo = false
-local SpeedAtivo = false
-local GravandoRota = false
-local PontosRota = {}
-
--- SISTEMA DE PERSISTÊNCIA (AUTO-SAVE EM JSON)
-local DadosSalvos = {
-    Slots = {
-        Slot1 = { CFrame = nil, Nome = "Lugar 1" },
-        Slot2 = { CFrame = nil, Nome = "Lugar 2" },
-        Slot3 = { CFrame = nil, Nome = "Lugar 3" }
-    }
+-- [[ SYTEHUB – COMPLETO E ATUALIZADO ]] --
+local Rayfield = nil
+local rayfieldSources = {
+    "https://raw.githubusercontent.com/SiriusSoftwareLTD/Rayfield/main/source.lua",
+    "https://raw.githubusercontent.com/xHeptc/Rayfield-UI-Module/main/source.lua",
+    "https://raw.githubusercontent.com/shlexware/Rayfield/main/source.lua",
 }
 
-local function SalvarNoDisco()
-    if writefile then
+for _, url in ipairs(rayfieldSources) do
+    if not Rayfield then
         pcall(function()
-            local dadosParaSalvar = { Slots = {} }
-            for k, v in pairs(DadosSalvos.Slots) do
-                dadosParaSalvar.Slots[k] = {
-                    Nome = v.Nome,
-                    CFrame = v.CFrame and {v.CFrame:GetComponents()} or nil
-                }
-            end
-            writefile(ARQUIVO_DADOS, HttpService:JSONEncode(dadosParaSalvar))
-        end)
-    end
-end
-
-local function CarregarDoDisco()
-    if readfile and isfile and isfile(ARQUIVO_DADOS) then
-        pcall(function()
-            local dadosCodificados = HttpService:JSONDecode(readfile(ARQUIVO_DADOS))
-            if dadosCodificados and dadosCodificados.Slots then
-                for k, v in pairs(dadosCodificados.Slots) do
-                    if DadosSalvos.Slots[k] then
-                        if v.CFrame then
-                            DadosSalvos.Slots[k].CFrame = CFrame.new(unpack(v.CFrame))
-                        end
-                        if v.Nome then
-                            DadosSalvos.Slots[k].Nome = v.Nome
-                        end
-                    end
-                end
+            local src = game:HttpGet(url)
+            if src and #src > 100 then
+                Rayfield = loadstring(src)()
             end
         end)
     end
 end
-CarregarDoDisco()
 
--- PROTEÇÃO DE GUI CONTRA ANTI-CHEAT
-local ProtecaoGUI = (gethui and gethui()) or game:GetService("CoreGui")
-local NomeGUI = "SyteHub_" .. tostring(math.random(100000, 999999))
-
-for _, child in ipairs(ProtecaoGUI:GetChildren()) do
-    if string.find(child.Name, "SyteHub") then child:Destroy() end
-end
-
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = NomeGUI
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = ProtecaoGUI
-
--- OVERLAY DE TELA ESCURA (MICRO-BYPASS ANIMADO)
-local BlackScreen = Instance.new("Frame")
-BlackScreen.Size = UDim2.new(1, 0, 1, 0)
-BlackScreen.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
-BlackScreen.BackgroundTransparency = 1
-BlackScreen.ZIndex = 9999
-BlackScreen.Parent = ScreenGui
-
-local LoadingText = Instance.new("TextLabel")
-LoadingText.Size = UDim2.new(1, 0, 0, 50)
-LoadingText.Position = UDim2.new(0, 0, 0.5, -25)
-LoadingText.BackgroundTransparency = 1
-LoadingText.Text = "⚡ Teleportando (Syté Hub)..."
-LoadingText.TextColor3 = Color3.fromRGB(255, 255, 255)
-LoadingText.TextSize = 18
-LoadingText.Font = Enum.Font.GothamBold
-LoadingText.TextTransparency = 1
-LoadingText.ZIndex = 10000
-LoadingText.Parent = BlackScreen
-
-local function AlternarTelaEscura(ativar)
-    local transp = ativar and 0 or 1
-    TweenService:Create(BlackScreen, TweenInfo.new(0.25), {BackgroundTransparency = transp}):Play()
-    TweenService:Create(LoadingText, TweenInfo.new(0.25), {TextTransparency = transp}):Play()
-    task.wait(0.25)
-end
-
--- VERIFICADOR COMPLEXO DE ADMINS E PROXIMIDADE
-local function DetectarAdmins()
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            if game.CreatorType == Enum.CreatorType.User and p.UserId == game.CreatorId then return true end
-            local isStaff = false
-            pcall(function()
-                if game.CreatorType == Enum.CreatorType.Group and p:GetRankInGroup(game.CreatorId) >= 100 then
-                    isStaff = true
-                end
-            end)
-            if isStaff then return true end
-            if p.Character and p.Character:FindFirstChild("Head") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head") then
-                if (p.Character.Head.Position - LocalPlayer.Character.Head.Position).Magnitude < 18 then return true end
-            end
-        end
-    end
-    return false
-end
-
--- INTERFACE PRINCIPAL
-local OpenBtn = Instance.new("TextButton")
-OpenBtn.Size = UDim2.new(0, 50, 0, 50)
-OpenBtn.Position = UDim2.new(0.05, 0, 0.2, 0)
-OpenBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-OpenBtn.Text = "Syté"
-OpenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-OpenBtn.Font = Enum.Font.GothamBold
-OpenBtn.Visible = false
-OpenBtn.Active = true
-OpenBtn.Draggable = true
-OpenBtn.Parent = ScreenGui
-Instance.new("UICorner", OpenBtn).CornerRadius = UDim.new(1, 0)
-
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 340, 0, 380)
-MainFrame.Position = UDim2.new(0.5, -170, 0.3, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 22)
-MainFrame.Active = true
-MainFrame.Draggable = true
-MainFrame.Parent = ScreenGui
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
-
-local Topbar = Instance.new("Frame")
-Topbar.Size = UDim2.new(1, 0, 0, 45)
-Topbar.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-Topbar.Parent = MainFrame
-Instance.new("UICorner", Topbar).CornerRadius = UDim.new(0, 12)
-
-local Logo = Instance.new("ImageLabel")
-Logo.Size = UDim2.new(0, 32, 0, 32)
-Logo.Position = UDim2.new(0, 10, 0, 6.5)
-Logo.BackgroundTransparency = 1
-Logo.Parent = Topbar
-Instance.new("UICorner", Logo).CornerRadius = UDim.new(1, 0)
-
-task.spawn(function()
-    if writefile and getcustomasset then
-        pcall(function()
-            if not isfile("Picsart_26-08-14_18-49-50-140.jpg") then
-                writefile("Picsart_26-08-14_18-49-50-140.jpg", game:HttpGet(URL_DA_LOGO))
-            end
-            Logo.Image = getcustomasset("Picsart_26-08-14_18-49-50-140.jpg")
-        end)
-    end
-end)
-
-local Titulo = Instance.new("TextLabel")
-Titulo.Size = UDim2.new(0, 150, 1, 0)
-Titulo.Position = UDim2.new(0, 50, 0, 0)
-Titulo.BackgroundTransparency = 1
-Titulo.Text = "Syté Hub V6 Full"
-Titulo.TextColor3 = Color3.fromRGB(255, 255, 255)
-Titulo.TextSize = 17
-Titulo.Font = Enum.Font.GothamBold
-Titulo.TextXAlignment = Enum.TextXAlignment.Left
-Titulo.Parent = Topbar
-
-local BotaoMin = Instance.new("TextButton")
-BotaoMin.Size = UDim2.new(0, 28, 0, 28)
-BotaoMin.Position = UDim2.new(1, -65, 0, 8.5)
-BotaoMin.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-BotaoMin.Text = "-"
-BotaoMin.TextColor3 = Color3.fromRGB(255, 255, 255)
-BotaoMin.Font = Enum.Font.GothamBold
-BotaoMin.Parent = Topbar
-Instance.new("UICorner", BotaoMin).CornerRadius = UDim.new(0, 6)
-
-local BotaoFechar = Instance.new("TextButton")
-BotaoFechar.Size = UDim2.new(0, 28, 0, 28)
-BotaoFechar.Position = UDim2.new(1, -32, 0, 8.5)
-BotaoFechar.BackgroundColor3 = Color3.fromRGB(220, 50, 60)
-BotaoFechar.Text = "X"
-BotaoFechar.TextColor3 = Color3.fromRGB(255, 255, 255)
-BotaoFechar.Font = Enum.Font.GothamBold
-BotaoFechar.Parent = Topbar
-Instance.new("UICorner", BotaoFechar).CornerRadius = UDim.new(0, 6)
-
-BotaoMin.MouseButton1Click:Connect(function() MainFrame.Visible = false; OpenBtn.Visible = true end)
-OpenBtn.MouseButton1Click:Connect(function() MainFrame.Visible = true; OpenBtn.Visible = false end)
-BotaoFechar.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
-
--- CONTAINER ROLÁVEL CENTRAL
-local Scroll = Instance.new("ScrollingFrame")
-Scroll.Size = UDim2.new(1, -16, 1, -55)
-Scroll.Position = UDim2.new(0, 8, 0, 50)
-Scroll.BackgroundTransparency = 1
-Scroll.CanvasSize = UDim2.new(0, 0, 0, 530)
-Scroll.ScrollBarThickness = 4
-Scroll.Parent = MainFrame
-
--- TELEPORTE INSTANTÂNEO SEGURO (MICRO-BYPASS)
-local function TeleportarInstantaneoSeguro(destinoCFrame, btnRef)
-    if DetectarAdmins() then
-        btnRef.Text = "⚠️ RISCO"
-        btnRef.BackgroundColor3 = Color3.fromRGB(220, 100, 0)
-        task.wait(1.5)
-        btnRef.Text = "Teleportar"
-        btnRef.BackgroundColor3 = Color3.fromRGB(30, 130, 255)
-        return
-    end
-
-    local character = LocalPlayer.Character
-    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
-    
-    local hrp = character.HumanoidRootPart
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-
-    AlternarTelaEscura(true)
-
-    local cframeComOffset = destinoCFrame * CFrame.new(0, 2.5, 0)
-
-    hrp.AssemblyLinearVelocity = Vector3.zero
-    hrp.AssemblyAngularVelocity = Vector3.zero
-    hrp.Anchored = true
-
-    for _, part in ipairs(character:GetChildren()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = false
-        end
-    end
-
-    task.wait(0.05)
-    character:PivotTo(cframeComOffset)
-    task.wait(0.05)
-
-    hrp.Anchored = false
-    hrp.AssemblyLinearVelocity = Vector3.zero
-    hrp.AssemblyAngularVelocity = Vector3.zero
-    
-    if humanoid then
-        humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-    end
-
-    task.wait(0.1)
-    AlternarTelaEscura(false)
-end
-
--- SEÇÃO 1: SLOTS DE TELEPORTE (CÓDIGO COMPLETO)
-local function CriarSlot(chaveSlot, posicaoY)
-    local SlotFrame = Instance.new("Frame")
-    SlotFrame.Size = UDim2.new(1, -10, 0, 60)
-    SlotFrame.Position = UDim2.new(0, 5, 0, posicaoY)
-    SlotFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
-    SlotFrame.Parent = Scroll
-    Instance.new("UICorner", SlotFrame).CornerRadius = UDim.new(0, 8)
-
-    local NameInput = Instance.new("TextBox")
-    NameInput.Size = UDim2.new(0, 95, 0, 24)
-    NameInput.Position = UDim2.new(0, 8, 0, 6)
-    NameInput.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-    NameInput.Text = DadosSalvos.Slots[chaveSlot].Nome
-    NameInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-    NameInput.Font = Enum.Font.GothamSemibold
-    NameInput.TextSize = 12
-    NameInput.ClearTextOnFocus = false
-    NameInput.Parent = SlotFrame
-    Instance.new("UICorner", NameInput).CornerRadius = UDim.new(0, 5)
-
-    NameInput.FocusLost:Connect(function()
-        DadosSalvos.Slots[chaveSlot].Nome = NameInput.Text
-        SalvarNoDisco()
-    end)
-
-    local StatusLabel = Instance.new("TextLabel")
-    StatusLabel.Size = UDim2.new(0, 95, 0, 20)
-    StatusLabel.Position = UDim2.new(0, 8, 0, 32)
-    StatusLabel.BackgroundTransparency = 1
-    StatusLabel.Text = DadosSalvos.Slots[chaveSlot].CFrame and "● Gravado" or "○ Vazio"
-    StatusLabel.TextColor3 = DadosSalvos.Slots[chaveSlot].CFrame and Color3.fromRGB(45, 200, 80) or Color3.fromRGB(150, 150, 150)
-    StatusLabel.Font = Enum.Font.Gotham
-    StatusLabel.TextSize = 11
-    StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
-    StatusLabel.Parent = SlotFrame
-
-    local BotaoSalvar = Instance.new("TextButton")
-    BotaoSalvar.Size = UDim2.new(0, 95, 0, 36)
-    BotaoSalvar.Position = UDim2.new(0, 110, 0.5, -18)
-    BotaoSalvar.BackgroundColor3 = Color3.fromRGB(45, 170, 75)
-    BotaoSalvar.Text = "Salvar Pos"
-    BotaoSalvar.TextColor3 = Color3.fromRGB(255, 255, 255)
-    BotaoSalvar.Font = Enum.Font.GothamBold
-    BotaoSalvar.Parent = SlotFrame
-    Instance.new("UICorner", BotaoSalvar).CornerRadius = UDim.new(0, 6)
-
-    local BotaoTeleporte = Instance.new("TextButton")
-    BotaoTeleporte.Size = UDim2.new(0, 95, 0, 36)
-    BotaoTeleporte.Position = UDim2.new(0, 210, 0.5, -18)
-    BotaoTeleporte.BackgroundColor3 = Color3.fromRGB(30, 130, 255)
-    BotaoTeleporte.Text = "Teleportar"
-    BotaoTeleporte.TextColor3 = Color3.fromRGB(255, 255, 255)
-    BotaoTeleporte.Font = Enum.Font.GothamBold
-    BotaoTeleporte.Parent = SlotFrame
-    Instance.new("UICorner", BotaoTeleporte).CornerRadius = UDim.new(0, 6)
-
-    BotaoSalvar.MouseButton1Click:Connect(function()
-        local char = LocalPlayer.Character
-        if char and char.PrimaryPart then
-            DadosSalvos.Slots[chaveSlot].CFrame = char:GetPivot()
-            SalvarNoDisco()
-            StatusLabel.Text = "● Gravado"
-            StatusLabel.TextColor3 = Color3.fromRGB(45, 200, 80)
-            BotaoSalvar.Text = "Salvo!"
-            task.wait(1)
-            BotaoSalvar.Text = "Salvar Pos"
-        end
-    end)
-
-    BotaoTeleporte.MouseButton1Click:Connect(function()
-        local pos = DadosSalvos.Slots[chaveSlot].CFrame
-        if pos then
-            TeleportarInstantaneoSeguro(pos, BotaoTeleporte)
-        else
-            BotaoTeleporte.Text = "Vazio!"
-            task.wait(1)
-            BotaoTeleporte.Text = "Teleportar"
-        end
-    end)
-end
-
-CriarSlot("Slot1", 5)
-CriarSlot("Slot2", 70)
-CriarSlot("Slot3", 135)
-
--- SEÇÃO 2: DEMAIS RECURSOS (AIMBOT, AUTO-FARM, SPEED, FLY, ANTI-LAG)
-local function CriarBotaoAba(texto, posicaoY, callback)
-    local btn = Instance.new("TextButton")
-    btn.Parent = Scroll
-    btn.Size = UDim2.new(1, -10, 0, 38)
-    btn.Position = UDim2.new(0, 5, 0, posicaoY)
-    btn.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.Text = texto
-    btn.Font = Enum.Font.GothamSemibold
-    btn.TextSize = 12
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-    btn.MouseButton1Click:Connect(function() callback(btn) end)
-    return btn
-end
-
--- Aimbot
-local BtnAimbot = CriarBotaoAba("🎯 Aimbot [DESLIGADO]", 205, function(btn)
-    AimbotAtivo = not AimbotAtivo
-    btn.Text = "🎯 Aimbot " .. (AimbotAtivo and "[LIGADO]" or "[DESLIGADO]")
-    btn.BackgroundColor3 = AimbotAtivo and Color3.fromRGB(45, 170, 75) or Color3.fromRGB(35, 35, 40)
-end)
-
-RunService.RenderStepped:Connect(function()
-    if AimbotAtivo then
-        local Alvo = nil
-        local MenorDist = AimbotFOV
-
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
-                local head = player.Character.Head
-                local pos, visible = Camera:WorldToViewportPoint(head.Position)
-                if visible then
-                    local dist = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)).Magnitude
-                    if dist < MenorDist then
-                        Alvo = head
-                        MenorDist = dist
-                    end
-                end
-            end
-        end
-
-        if Alvo then
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, Alvo.Position)
-        end
-    end
-end)
-
--- Speed
-CriarBotaoAba("🏃 Speed 50 [DESLIGADO]", 250, function(btn)
-    SpeedAtivo = not SpeedAtivo
-    local char = LocalPlayer.Character
-    if char and char:FindFirstChild("Humanoid") then
-        char.Humanoid.WalkSpeed = SpeedAtivo and 50 or 16
-        btn.Text = "🏃 Speed 50 " .. (SpeedAtivo and "[LIGADO]" or "[DESLIGADO]")
-        btn.BackgroundColor3 = SpeedAtivo and Color3.fromRGB(45, 170, 75) or Color3.fromRGB(35, 35, 40)
-    end
-end)
-
--- Fly
-CriarBotaoAba("⬆ Fly [DESLIGADO]", 295, function(btn)
-    FlyAtivo = not FlyAtivo
-    local char = LocalPlayer.Character
-    if char and char:FindFirstChild("HumanoidRootPart") then
-        local hrp = char.HumanoidRootPart
-        if FlyAtivo then
-            local bv = Instance.new("BodyVelocity")
-            bv.Name = "SyteFly"
-            bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-            bv.Velocity = Vector3.new(0, 30, 0)
-            bv.Parent = hrp
-        else
-            if hrp:FindFirstChild("SyteFly") then hrp.SyteFly:Destroy() end
-        end
-        btn.Text = "⬆ Fly " .. (FlyAtivo and "[LIGADO]" or "[DESLIGADO]")
-        btn.BackgroundColor3 = FlyAtivo and Color3.fromRGB(45, 170, 75) or Color3.fromRGB(35, 35, 40)
-    end
-end)
-
--- Gravação de Rota (Auto Farm)
-CriarBotaoAba("🔴 Gravar Rota de Auto Farm", 340, function(btn)
-    GravandoRota = not GravandoRota
-    if GravandoRota then
-        PontosRota = {}
-        btn.Text = "⏹ Parar Gravação"
-        btn.BackgroundColor3 = Color3.fromRGB(220, 50, 60)
-        task.spawn(function()
-            while GravandoRota do
-                local char = LocalPlayer.Character
-                if char and char:FindFirstChild("HumanoidRootPart") then
-                    table.insert(PontosRota, char.HumanoidRootPart.Position)
-                end
-                task.wait(0.5)
-            end
-        end)
-    else
-        btn.Text = "🔴 Gravar Rota (" .. #PontosRota .. " pontos)"
-        btn.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
-    end
-end)
-
--- Executar Rota
-CriarBotaoAba("▶ Executar Rota Gravada", 385, function(btn)
-    if #PontosRota == 0 then
-        btn.Text = "⚠️ Nenhum ponto gravado!"
-        task.wait(1.2)
-        btn.Text = "▶ Executar Rota Gravada"
-        return
-    end
-
-    task.spawn(function()
-        btn.Text = "⚙ Executando Auto Farm..."
-        local char = LocalPlayer.Character
-        if char and char:FindFirstChild("Humanoid") then
-            for _, pos in ipairs(PontosRota) do
-                char.Humanoid:MoveTo(pos)
-                char.Humanoid.MoveToFinished:Wait()
-            end
-        end
-        btn.Text = "▶ Executar Rota Gravada"
-    end)
-end)
-
--- Anti-Lag
-CriarBotaoAba("⚡ Anti-Lag (Remover Partículas)", 430, function(btn)
-    local removidos = 0
-    pcall(function()
-        for _, v in pairs(game:GetDescendants()) do
-            if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") then
-                v:Destroy()
-                removidos = removidos + 1
-            end
-        end
-    end)
-    btn.Text = "⚡ " .. removidos .. " Partículas Removidas!"
-    task.wait(1.5)
-    btn.Text = "⚡ Anti-Lag (Remover Partículas)"
-end)
-        TargetName = "NPC"
-    },
-    Performance = {
-        AntiLagActive = false
-    }
-}
-
--- ==============================================================================
--- 4. ANTI-LAG & FPS BOOSTER ENGINE
--- ==============================================================================
-local AntiLagEngine = {}
-
-function AntiLagEngine:Enable()
-    SyteHubConfig.Performance.AntiLagActive = true
-    
-    -- Otimização de iluminação global
-    Lighting.GlobalShadows = false
-    Lighting.FogEnd = 9e9
-    Lighting.Brightness = 1
-    
-    -- Limpeza de efeitos visuais e texturas pesadas
-    for _, v in ipairs(Workspace:GetDescendants()) do
-        if v:IsA("BasePart") then
-            v.Material = Enum.Material.Plastic
-            v.Reflectance = 0
-        elseif v:IsA("Decal") or v:IsA("Texture") then
-            v:Destroy()
-        elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") then
-            v.Enabled = false
-        end
-    end
-    
-    -- Desabilita efeitos na iluminação
-    for _, effect in ipairs(Lighting:GetChildren()) do
-        if effect:IsA("PostEffect") or effect:IsA("BloomEffect") or effect:IsA("BlurEffect") or effect:IsA("SunRaysEffect") then
-            effect.Enabled = false
-        end
-    end
-end
-
--- ==============================================================================
--- 5. AUTO FARM ENGINE (TARGET LOCK & POSITIONING)
--- ==============================================================================
-local AutoFarmEngine = {}
-
-function AutoFarmEngine:GetClosestTarget()
-    local closestTarget = nil
-    local shortestDistance = math.huge
-    local char = LocalPlayer.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
-    local myPos = char.HumanoidRootPart.Position
-
-    -- Procura por Inimigos / NPCs no Workspace
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("Humanoid") and obj.Health > 0 and obj.Parent ~= char then
-            local targetHRP = obj.Parent:FindFirstChild("HumanoidRootPart") or obj.Parent:FindFirstChild("Head")
-            if targetHRP then
-                local dist = (targetHRP.Position - myPos).Magnitude
-                if dist < shortestDistance then
-                    shortestDistance = dist
-                    closestTarget = targetHRP
-                end
-            end
-        end
-    end
-    return closestTarget
-end
-
-ConnectionManager:Bind("AutoFarmLoop", RunService.Heartbeat:Connect(function()
-    if SyteHubConfig.AutoFarm.Enabled then
-        local char = LocalPlayer.Character
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            local target = AutoFarmEngine:GetClosestTarget()
-            if target then
-                -- Posiciona o jogador com segurança atrás do alvo
-                local farmCFrame = target.CFrame * CFrame.new(0, 0, SyteHubConfig.AutoFarm.Distance)
-                char:PivotTo(farmCFrame)
-                
-                -- Ataca automaticamente se houver ferramenta equipada
-                local tool = char:FindFirstChildOfClass("Tool")
-                if tool then
-                    tool:Activate()
-                end
-            end
-        end
-    end
-end))
-
--- ==============================================================================
--- 6. COMBAT ENGINE (AIMBOT)
--- ==============================================================================
-local CombatEngine = {}
-local FOVFrame = nil
-
-function CombatEngine:InitFOVOverlay(parent: Instance)
-    if FOVFrame then FOVFrame:Destroy() end
-    
-    local CircleContainer = Instance.new("Frame")
-    CircleContainer.Name = "SytéFOVOverlay"
-    CircleContainer.AnchorPoint = Vector2.new(0.5, 0.5)
-    CircleContainer.Position = UDim2.new(0.5, 0, 0.5, 0)
-    CircleContainer.BackgroundTransparency = 1
-    CircleContainer.Visible = false
-    CircleContainer.Parent = parent
-
-    local UIStroke = Instance.new("UIStroke")
-    UIStroke.Color = Color3.fromRGB(255, 55, 55)
-    UIStroke.Thickness = 1.5
-    UIStroke.Transparency = 0.3
-    UIStroke.Parent = CircleContainer
-
-    local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(1, 0)
-    UICorner.Parent = CircleContainer
-
-    FOVFrame = CircleContainer
-end
-
-function CombatEngine:GetClosestTarget()
-    local closestPart = nil
-    local shortestDistance = SyteHubConfig.Combat.FOV
-    local viewportCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character then
-            if not (SyteHubConfig.Combat.TeamCheck and player.Team == LocalPlayer.Team) then
-                local character = player.Character
-                local targetPart = character:FindFirstChild(SyteHubConfig.Combat.TargetPart)
-                local humanoid = character:FindFirstChildOfClass("Humanoid")
-
-                if targetPart and humanoid and humanoid.Health > 0 then
-                    local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
-                    if onScreen then
-                        local isVisible = true
-                        if SyteHubConfig.Combat.WallCheck then
-                            local rayParams = RaycastParams.new()
-                            rayParams.FilterType = RaycastFilterType.Exclude
-                            rayParams.FilterDescendantsInstances = {LocalPlayer.Character, character}
-                            
-                            local rayResult = Workspace:Raycast(Camera.CFrame.Position, targetPart.Position - Camera.CFrame.Position, rayParams)
-                            if rayResult then isVisible = false end
-                        end
-
-                        if isVisible then
-                            local screenVector = Vector2.new(screenPos.X, screenPos.Y)
-                            local magnitude = (screenVector - viewportCenter).Magnitude
-                            if magnitude < shortestDistance then
-                                shortestDistance = magnitude
-                                closestPart = targetPart
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return closestPart
-end
-
-ConnectionManager:Bind("CombatLoop", RunService.RenderStepped:Connect(function()
-    if FOVFrame then
-        FOVFrame.Visible = SyteHubConfig.Combat.AimbotEnabled
-        FOVFrame.Size = UDim2.new(0, SyteHubConfig.Combat.FOV * 2, 0, SyteHubConfig.Combat.FOV * 2)
-    end
-
-    if SyteHubConfig.Combat.AimbotEnabled then
-        local targetPart = CombatEngine:GetClosestTarget()
-        if targetPart then
-            local targetPosition = targetPart.Position
-            if SyteHubConfig.Combat.Prediction and targetPart.Parent:FindFirstChild("HumanoidRootPart") then
-                local velocity = targetPart.Parent.HumanoidRootPart.AssemblyLinearVelocity
-                targetPosition = targetPosition + (velocity * SyteHubConfig.Combat.PredictionVelocity)
-            end
-
-            local currentCFrame = Camera.CFrame
-            local targetCFrame = CFrame.new(currentCFrame.Position, targetPosition)
-            Camera.CFrame = currentCFrame:Lerp(targetCFrame, SyteHubConfig.Combat.Smoothness)
-        end
-    end
-end))
-
--- ==============================================================================
--- 7. MOVEMENT ENGINE (FLY & NOCLIP)
--- ==============================================================================
-local MovementEngine = {}
-
-function MovementEngine:SetFly(state: boolean)
-    SyteHubConfig.Movement.FlyEnabled = state
-    local char = LocalPlayer.Character
-    if not char then return end
-
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if not hrp or not humanoid then return end
-
-    if state then
-        humanoid.PlatformStand = true
-        local attachment = hrp:FindFirstChild("SytéFlyAttach") or Instance.new("Attachment", hrp)
-        attachment.Name = "SytéFlyAttach"
-
-        local linearVel = Instance.new("LinearVelocity", hrp)
-        linearVel.Name = "SytéLinearVelocity"
-        linearVel.Attachment0 = attachment
-        linearVel.MaxForce = math.huge
-        linearVel.VectorVelocity = Vector3.zero
-        linearVel.RelativeTo = Enum.ActuatorRelativeTo.World
-
-        local alignOrient = Instance.new("AlignOrientation", hrp)
-        alignOrient.Name = "SytéAlignOrient"
-        alignOrient.Attachment0 = attachment
-        alignOrient.MaxTorque = math.huge
-        alignOrient.Responsiveness = 200
-        alignOrient.Mode = Enum.OrientationAlignmentMode.OneAttachment
-
-        ConnectionManager:Bind("FlyPhysics", RunService.Heartbeat:Connect(function()
-            if not SyteHubConfig.Movement.FlyEnabled or not char:FindFirstChild("HumanoidRootPart") then
-                MovementEngine:SetFly(false)
-                return
-            end
-            linearVel.VectorVelocity = Camera.CFrame.LookVector * SyteHubConfig.Movement.FlySpeed
-            alignOrient.CFrame = Camera.CFrame
-        end))
-    else
-        humanoid.PlatformStand = false
-        ConnectionManager:Unbind("FlyPhysics")
-        if hrp:FindFirstChild("SytéLinearVelocity") then hrp.SytéLinearVelocity:Destroy() end
-        if hrp:FindFirstChild("SytéAlignOrient") then hrp.SytéAlignOrient:Destroy() end
-        if hrp:FindFirstChild("SytéFlyAttach") then hrp.SytéFlyAttach:Destroy() end
-    end
-end
-
-ConnectionManager:Bind("NoclipLoop", RunService.Stepped:Connect(function()
-    if SyteHubConfig.Movement.Noclip and LocalPlayer.Character then
-        for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = false
-            end
-        end
-    end
-end))
-
--- ==============================================================================
--- 8. INTERFACE GRÁFICA PROFISSIONAL COM LOGO PERSONALIZADA
--- ==============================================================================
-local SyteUI = {}
-
-function SyteUI:BuildInterface()
-    local targetParent = LocalPlayer:WaitForChild("PlayerGui")
-    
-    if targetParent:FindFirstChild("SyteHub_Enterprise") then
-        targetParent.SyteHub_Enterprise:Destroy()
-    end
-
+if not Rayfield then
+    warn("⚠️ Rayfield não carregou. Usando UI de emergência.")
+    local CoreGui = game:GetService("CoreGui")
+    local guiParent = (gethui and gethui()) or CoreGui or player:WaitForChild("PlayerGui")
     local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "SyteHub_Enterprise"
+    ScreenGui.Name = "Sytehub_Emergency"
+    ScreenGui.Parent = guiParent
     ScreenGui.ResetOnSpawn = false
-    ScreenGui.Parent = targetParent
 
-    CombatEngine:InitFOVOverlay(ScreenGui)
-
-    -- Botão Flutuante com a Sua Logo
-    local FloatButton = Instance.new("ImageButton")
-    FloatButton.Name = "FloatToggle"
-    FloatButton.Size = UDim2.new(0, 52, 0, 52)
-    FloatButton.Position = UDim2.new(0.02, 0, 0.2, 0)
-    FloatButton.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    FloatButton.Image = SyteHubConfig.LogoUrl
-    FloatButton.Parent = ScreenGui
-
-    Instance.new("UICorner", FloatButton).CornerRadius = UDim.new(1, 0)
-    local floatStroke = Instance.new("UIStroke", FloatButton)
-    floatStroke.Color = Color3.fromRGB(255, 55, 55)
-    floatStroke.Thickness = 2
-
-    -- Main Window Frame
-    local MainFrame = Instance.new("Frame")
-    MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 480, 0, 360)
-    MainFrame.Position = UDim2.new(0.5, -240, 0.5, -180)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-    MainFrame.Visible = false
-    MainFrame.ClipsDescendants = true
-    MainFrame.Parent = ScreenGui
-
-    Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
-    local mainStroke = Instance.new("UIStroke", MainFrame)
-    mainStroke.Color = Color3.fromRGB(40, 40, 50)
-
-    -- TopBar com Logo e Título
-    local TopBar = Instance.new("Frame")
-    TopBar.Size = UDim2.new(1, 0, 0, 45)
-    TopBar.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
-    TopBar.Parent = MainFrame
-
-    local LogoIcon = Instance.new("ImageLabel")
-    LogoIcon.Size = UDim2.new(0, 32, 0, 32)
-    LogoIcon.Position = UDim2.new(0, 8, 0.5, -16)
-    LogoIcon.BackgroundTransparency = 1
-    LogoIcon.Image = SyteHubConfig.LogoUrl
-    LogoIcon.Parent = TopBar
-
-    Instance.new("UICorner", LogoIcon).CornerRadius = UDim.new(1, 0)
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(0, 400, 0, 300)
+    Frame.Position = UDim2.new(0.5, -200, 0.5, -150)
+    Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+    Frame.BorderSizePixel = 0
+    Frame.Parent = ScreenGui
+    Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 12)
 
     local Title = Instance.new("TextLabel")
-    Title.Position = UDim2.new(0, 48, 0, 0)
-    Title.Size = UDim2.new(0.7, 0, 1, 0)
-    Title.Text = "SYTÉHUB <font color=\"#FF3737\">ENTERPRISE v4.5</font>"
-    Title.RichText = true
-    Title.TextColor3 = Color3.fromRGB(240, 240, 240)
-    Title.TextSize = 15
-    Title.Font = Enum.Font.GothamBold
-    Title.TextXAlignment = Enum.TextXAlignment.Left
+    Title.Size = UDim2.new(1, 0, 0, 40)
     Title.BackgroundTransparency = 1
-    Title.Parent = TopBar
+    Title.Text = "⚠️ Sytehub (Modo Offline)"
+    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Title.TextSize = 20
+    Title.Font = Enum.Font.GothamBold
+    Title.Parent = Frame
 
-    -- Container Viewport Scrollable
-    local ContentContainer = Instance.new("ScrollingFrame")
-    ContentContainer.Size = UDim2.new(1, -16, 1, -55)
-    ContentContainer.Position = UDim2.new(0, 8, 0, 50)
-    ContentContainer.BackgroundTransparency = 1
-    ContentContainer.ScrollBarThickness = 3
-    ContentContainer.ScrollBarImageColor3 = Color3.fromRGB(255, 55, 55)
-    ContentContainer.Parent = MainFrame
+    local Msg = Instance.new("TextLabel")
+    Msg.Size = UDim2.new(1, -20, 1, -60)
+    Msg.Position = UDim2.new(0, 10, 0, 50)
+    Msg.BackgroundTransparency = 1
+    Msg.Text = "Rayfield não disponível.\nVerifique sua conexão.\nTente executar novamente."
+    Msg.TextColor3 = Color3.fromRGB(200, 200, 200)
+    Msg.TextSize = 16
+    Msg.Font = Enum.Font.Gotham
+    Msg.TextWrapped = true
+    Msg.Parent = Frame
 
-    local ContentLayout = Instance.new("UIListLayout")
-    ContentLayout.Padding = UDim.new(0, 8)
-    ContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    ContentLayout.Parent = ContentContainer
+    local CloseBtn = Instance.new("TextButton")
+    CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+    CloseBtn.Position = UDim2.new(1, -40, 0, 5)
+    CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    CloseBtn.Text = "✕"
+    CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CloseBtn.TextSize = 16
+    CloseBtn.Font = Enum.Font.GothamBold
+    CloseBtn.BorderSizePixel = 0
+    CloseBtn.Parent = Frame
+    Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
+    CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
 
-    ContentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        ContentContainer.CanvasSize = UDim2.new(0, 0, 0, ContentLayout.AbsoluteContentSize.Y + 10)
+    return
+end
+
+print("✅ Rayfield carregado com sucesso!")
+
+local HttpService = game:GetService("HttpService")
+local Window = Rayfield:CreateWindow({
+    Name = "⚡ SYTEHUB ⚡",
+    LoadingTitle = "Sytehub",
+    LoadingSubtitle = "por Syté",
+    ConfigurationSaving = { Enabled = false },
+    Discord = { Enabled = false },
+    KeySystem = false
+})
+
+if not Window then
+    warn("❌ Falha ao criar a Window.")
+    return
+end
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local SoundService = game:GetService("SoundService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local Workspace = game:GetService("Workspace")
+local player = Players.LocalPlayer
+
+-- ========== VARIÁVEIS GLOBAIS ==========
+local SavedRoutes = {}
+local SaveFileNameFolder = "Sytehub_Parkour"
+local SaveFileNameFile = "SavedRoutes.json"
+
+local function SaveRoutesToFile()
+    local success, encoded = pcall(function()
+        return HttpService:JSONEncode(SavedRoutes)
     end)
+    if success then
+        if not isfolder(SaveFileNameFolder) then
+            makefolder(SaveFileNameFolder)
+        end
+        writefile(SaveFileNameFolder .. "/" .. SaveFileNameFile, encoded)
+    end
+end
 
-    -- Construtor de Elementos UI
-    local function CreateToggle(text: string, default: boolean, callback: (boolean) -> ())
-        local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(1, -6, 0, 38)
-        frame.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
-        frame.Parent = ContentContainer
-
-        Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
-
-        local label = Instance.new("TextLabel")
-        label.Position = UDim2.new(0.04, 0, 0, 0)
-        label.Size = UDim2.new(0.7, 0, 1, 0)
-        label.Text = text
-        label.TextColor3 = Color3.fromRGB(220, 220, 220)
-        label.Font = Enum.Font.GothamMedium
-        label.TextSize = 13
-        label.TextXAlignment = Enum.TextXAlignment.Left
-        label.BackgroundTransparency = 1
-        label.Parent = frame
-
-        local switch = Instance.new("TextButton")
-        switch.Size = UDim2.new(0, 40, 0, 20)
-        switch.Position = UDim2.new(0.95, -42, 0.5, -10)
-        switch.BackgroundColor3 = default and Color3.fromRGB(255, 55, 55) or Color3.fromRGB(50, 50, 60)
-        switch.Text = ""
-        switch.Parent = frame
-
-        Instance.new("UICorner", switch).CornerRadius = UDim.new(1, 0)
-
-        local state = default
-        switch.MouseButton1Click:Connect(function()
-            state = not state
-            TweenService:Create(switch, TweenInfo.new(0.2), {
-                BackgroundColor3 = state and Color3.fromRGB(255, 55, 55) or Color3.fromRGB(50, 50, 60)
-            }):Play()
-            callback(state)
+local function LoadRoutesFromFile()
+    if readfile and isfile and isfile(SaveFileNameFolder .. "/" .. SaveFileNameFile) then
+        local success, decoded = pcall(function()
+            return HttpService:JSONDecode(readfile(SaveFileNameFolder .. "/" .. SaveFileNameFile))
         end)
+        if success and type(decoded) == "table" then
+            SavedRoutes = decoded
+        end
+    end
+end
+LoadRoutesFromFile()
+
+local function GetChar()
+    local char = player.Character
+    if char then
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChild("Humanoid")
+        return char, root, hum
+    end
+    return nil, nil, nil
+end
+
+local function formatTime(seconds)
+    if not seconds then return "0s" end
+    if seconds < 60 then
+        return math.floor(seconds) .. "s"
+    elseif seconds < 3600 then
+        return math.floor(seconds / 60) .. "m"
+    else
+        return string.format("%.1fh", seconds / 3600)
+    end
+end
+
+-- ========== ABA 1: GRAVADOR ==========
+local MacroTab = Window:CreateTab("🎬 Gravador", 4483362458)
+MacroTab:CreateSection("Painel Flutuante & Gravador Pro")
+
+local miniHubToggle = MacroTab:CreateToggle({
+    Name = "📱 Ativar Mini-Hub na Tela",
+    CurrentValue = false,
+    Callback = function(v)
+        if _G.SytehubMiniHub then
+            _G.SytehubMiniHub.Enabled = v
+        end
+    end,
+})
+
+task.spawn(function()
+    local controls = nil
+    pcall(function()
+        local PlayerModule = require(player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule"))
+        controls = PlayerModule:GetControls()
+    end)
+
+    if CoreGui:FindFirstChild("SytehubStandalone") then
+        CoreGui.SytehubStandalone:Destroy()
     end
 
-    local function CreateButton(text: string, callback: () -> ())
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1, -6, 0, 38)
-        btn.BackgroundColor3 = Color3.fromRGB(255, 55, 55)
-        btn.Text = text
-        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        btn.Font = Enum.Font.GothamBold
-        btn.TextSize = 13
-        btn.Parent = ContentContainer
-
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-        btn.MouseButton1Click:Connect(callback)
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "SytehubStandalone"
+    screenGui.ResetOnSpawn = false
+    screenGui.IgnoreGuiInset = true
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    pcall(function()
+        if gethui then
+            screenGui.Parent = gethui()
+        else
+            screenGui.Parent = CoreGui
+        end
+    end)
+    if not screenGui.Parent then
+        screenGui.Parent = player:WaitForChild("PlayerGui")
     end
+    _G.SytehubMiniHub = screenGui
+    screenGui.Enabled = false
 
-    -- Registrando Controles na UI
-    CreateToggle("🌾 Auto Farm (Inimigos & Mobs)", SyteHubConfig.AutoFarm.Enabled, function(v)
-        SyteHubConfig.AutoFarm.Enabled = v
-    end)
+    local hub = Instance.new("Frame")
+    hub.Size = UDim2.fromOffset(260, 320)
+    hub.Position = UDim2.new(0, 85, 0.5, -160)
+    hub.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+    hub.BorderSizePixel = 0
+    hub.ClipsDescendants = true
+    hub.Visible = false
+    hub.Parent = screenGui
+    Instance.new("UICorner", hub).CornerRadius = UDim.new(0, 10)
 
-    CreateButton("🚀 Ativar Anti-Lag (FPS Booster)", function()
-        AntiLagEngine:Enable()
-    end)
+    local hubStroke = Instance.new("UIStroke", hub)
+    hubStroke.Color = Color3.fromRGB(255, 120, 0)
+    hubStroke.Thickness = 1.5
 
-    CreateToggle("🎯 Aimbot (Lock Head + Raycast)", SyteHubConfig.Combat.AimbotEnabled, function(v)
-        SyteHubConfig.Combat.AimbotEnabled = v
-    end)
+    local hubDragging, hubDragInput, hubDragStart, hubStartPos
+    local topBar = Instance.new("Frame")
+    topBar.Size = UDim2.new(1, 0, 0, 32)
+    topBar.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+    topBar.Parent = hub
+    Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 10)
 
-    CreateToggle("✈️ Vector Fly Engine", SyteHubConfig.Movement.FlyEnabled, function(v)
-        MovementEngine:SetFly(v)
-    end)
-
-    CreateToggle("👻 Noclip (Atravessar Paredes)", SyteHubConfig.Movement.Noclip, function(v)
-        SyteHubConfig.Movement.Noclip = v
-    end)
-
-    -- Evento de Alternância da Janela
-    FloatButton.MouseButton1Click:Connect(function()
-        MainFrame.Visible = not MainFrame.Visible
-    end)
-
-    -- Sistema de Arraste (Touch & Mouse Support)
-    local dragging, dragStart, startPos
-    TopBar.InputBegan:Connect(function(input)
+    topBar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPos = MainFrame.Position
+            hubDragging = true
+            hubDragStart = input.Position
+            hubStartPos = hub.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    hubDragging = false
+                end
+            end)
+        end
+    end)
+
+    topBar.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            hubDragInput = input
         end
     end)
 
     UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - dragStart
-            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        if input == hubDragInput and hubDragging then
+            local delta = input.Position - hubDragStart
+            hub.Position = UDim2.new(
+                hubStartPos.X.Scale, hubStartPos.X.Offset + delta.X,
+                hubStartPos.Y.Scale, hubStartPos.Y.Offset + delta.Y
+            )
         end
     end)
 
-    UserInputService.InputEnded:Connect(function(input)
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, -35, 1, 0)
+    title.Position = UDim2.fromOffset(12, 0)
+    title.BackgroundTransparency = 1
+    title.Text = "⚡ SYTEHUB ⚡"
+    title.TextColor3 = Color3.fromRGB(255, 140, 0)
+    title.TextSize = 12
+    title.Font = Enum.Font.GothamBold
+    title.Parent = topBar
+
+    local closeButton = Instance.new("TextButton")
+    closeButton.Size = UDim2.fromOffset(24, 24)
+    closeButton.Position = UDim2.new(1, -28, 0, 4)
+    closeButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    closeButton.Text = "×"
+    closeButton.TextColor3 = Color3.fromRGB(255, 140, 0)
+    closeButton.TextSize = 12
+    closeButton.Font = Enum.Font.GothamBold
+    closeButton.Parent = topBar
+    Instance.new("UICorner", closeButton).CornerRadius = UDim.new(0, 6)
+
+    closeButton.MouseButton1Click:Connect(function()
+        screenGui.Enabled = false
+        miniHubToggle:Set(false)
+    end)
+
+    local miniButton = Instance.new("TextButton")
+    miniButton.Size = UDim2.fromOffset(48, 48)
+    miniButton.Position = UDim2.new(0, 15, 0.4, 0)
+    miniButton.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+    miniButton.Text = "⚡"
+    miniButton.TextColor3 = Color3.fromRGB(255, 140, 0)
+    miniButton.TextSize = 22
+    miniButton.Font = Enum.Font.GothamBold
+    miniButton.Visible = true
+    miniButton.AutoButtonColor = false
+    miniButton.Parent = screenGui
+    Instance.new("UICorner", miniButton).CornerRadius = UDim.new(0, 12)
+
+    local miniStroke = Instance.new("UIStroke", miniButton)
+    miniStroke.Color = Color3.fromRGB(255, 120, 0)
+    miniStroke.Thickness = 2
+
+    local dragging, dragInput, dragStart, startPos
+    local hasDragged = false
+
+    miniButton.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
+            dragging = true
+            hasDragged = false
+            dragStart = input.Position
+            startPos = miniButton.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    miniButton.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            if delta.Magnitude > 5 then
+                hasDragged = true
+            end
+            miniButton.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+
+    miniButton.MouseButton1Click:Connect(function()
+        if not hasDragged then
+            hub.Visible = not hub.Visible
+        end
+    end)
+
+    local mainPage = Instance.new("Frame")
+    mainPage.Size = UDim2.new(1, -12, 1, -42)
+    mainPage.Position = UDim2.new(0, 6, 0, 36)
+    mainPage.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    mainPage.Parent = hub
+    Instance.new("UICorner", mainPage).CornerRadius = UDim.new(0, 8)
+
+    local scrollFrame = Instance.new("ScrollingFrame")
+    scrollFrame.Size = UDim2.new(1, 0, 1, 0)
+    scrollFrame.BackgroundTransparency = 1
+    scrollFrame.ScrollBarThickness = 2
+    scrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    scrollFrame.Parent = mainPage
+
+    local uiList = Instance.new("UIListLayout")
+    uiList.FillDirection = Enum.FillDirection.Vertical
+    uiList.Padding = UDim.new(0, 5)
+    uiList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    uiList.Parent = scrollFrame
+    Instance.new("UIPadding", scrollFrame).PaddingTop = UDim.new(0, 6)
+
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.Size = UDim2.new(0.92, 0, 0, 14)
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.Text = "PRONTO"
+    statusLabel.TextColor3 = Color3.fromRGB(255, 140, 0)
+    statusLabel.TextSize = 10
+    statusLabel.Font = Enum.Font.GothamBold
+    statusLabel.TextXAlignment = Enum.TextXAlignment.Center
+    statusLabel.Parent = scrollFrame
+
+    local controlBar = Instance.new("Frame")
+    controlBar.Size = UDim2.new(0.92, 0, 0, 30)
+    controlBar.BackgroundTransparency = 1
+    controlBar.Parent = scrollFrame
+
+    local controlLayout = Instance.new("UIListLayout")
+    controlLayout.FillDirection = Enum.FillDirection.Horizontal
+    controlLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    controlLayout.Padding = UDim.new(0, 3)
+    controlLayout.Parent = controlBar
+
+    local recordButton = Instance.new("TextButton")
+    recordButton.Size = UDim2.new(0.19, 0, 1, 0)
+    recordButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    recordButton.Text = "🔴"
+    recordButton.TextColor3 = Color3.fromRGB(255, 90, 90)
+    recordButton.TextSize = 11
+    recordButton.Font = Enum.Font.GothamBold
+    recordButton.Parent = controlBar
+    Instance.new("UICorner", recordButton).CornerRadius = UDim.new(0, 6)
+
+    local replayButton = Instance.new("TextButton")
+    replayButton.Size = UDim2.new(0.19, 0, 1, 0)
+    replayButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    replayButton.Text = "▶"
+    replayButton.TextColor3 = Color3.fromRGB(255, 140, 0)
+    replayButton.TextSize = 11
+    replayButton.Font = Enum.Font.GothamBold
+    replayButton.Parent = controlBar
+    Instance.new("UICorner", replayButton).CornerRadius = UDim.new(0, 6)
+
+    local saveButton = Instance.new("TextButton")
+    saveButton.Size = UDim2.new(0.19, 0, 1, 0)
+    saveButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    saveButton.Text = "💾"
+    saveButton.TextColor3 = Color3.fromRGB(255, 160, 50)
+    saveButton.TextSize = 11
+    saveButton.Font = Enum.Font.GothamBold
+    saveButton.Parent = controlBar
+    Instance.new("UICorner", saveButton).CornerRadius = UDim.new(0, 6)
+
+    local exportButton = Instance.new("TextButton")
+    exportButton.Size = UDim2.new(0.19, 0, 1, 0)
+    exportButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    exportButton.Text = "📁"
+    exportButton.TextColor3 = Color3.fromRGB(220, 220, 220)
+    exportButton.TextSize = 11
+    exportButton.Font = Enum.Font.GothamBold
+    exportButton.Parent = controlBar
+    Instance.new("UICorner", exportButton).CornerRadius = UDim.new(0, 6)
+
+    local clearButton = Instance.new("TextButton")
+    clearButton.Size = UDim2.new(0.19, 0, 1, 0)
+    clearButton.BackgroundColor3 = Color3.fromRGB(40, 25, 25)
+    clearButton.Text = "🗑️"
+    clearButton.TextColor3 = Color3.fromRGB(220, 220, 220)
+    clearButton.TextSize = 11
+    clearButton.Font = Enum.Font.GothamBold
+    clearButton.Parent = controlBar
+    Instance.new("UICorner", clearButton).CornerRadius = UDim.new(0, 6)
+
+    local toggleLineRow = Instance.new("Frame")
+    toggleLineRow.Size = UDim2.new(0.92, 0, 0, 26)
+    toggleLineRow.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
+    toggleLineRow.Parent = scrollFrame
+    Instance.new("UICorner", toggleLineRow).CornerRadius = UDim.new(0, 6)
+
+    local toggleLineLabel = Instance.new("TextLabel")
+    toggleLineLabel.Size = UDim2.new(0.7, 0, 1, 0)
+    toggleLineLabel.Position = UDim2.fromOffset(8, 0)
+    toggleLineLabel.BackgroundTransparency = 1
+    toggleLineLabel.Text = "Mostrar Linhas de Rota"
+    toggleLineLabel.TextColor3 = Color3.fromRGB(210, 210, 210)
+    toggleLineLabel.TextSize = 10
+    toggleLineLabel.Font = Enum.Font.GothamSemibold
+    toggleLineLabel.TextXAlignment = Enum.TextXAlignment.Left
+    toggleLineLabel.Parent = toggleLineRow
+
+    local toggleLineBtn = Instance.new("TextButton")
+    toggleLineBtn.Size = UDim2.new(0, 40, 0, 18)
+    toggleLineBtn.Position = UDim2.new(1, -46, 0.5, -9)
+    toggleLineBtn.BackgroundColor3 = Color3.fromRGB(255, 140, 0)
+    toggleLineBtn.Text = "LIGADO"
+    toggleLineBtn.TextColor3 = Color3.fromRGB(15, 15, 15)
+    toggleLineBtn.TextSize = 9
+    toggleLineBtn.Font = Enum.Font.GothamBold
+    toggleLineBtn.Parent = toggleLineRow
+    Instance.new("UICorner", toggleLineBtn).CornerRadius = UDim.new(0, 4)
+
+    local renameBox = Instance.new("TextBox")
+    renameBox.Size = UDim2.new(0.92, 0, 0, 26)
+    renameBox.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
+    renameBox.PlaceholderText = "Nome da Gravação..."
+    renameBox.Text = ""
+    renameBox.TextColor3 = Color3.fromRGB(220, 220, 220)
+    renameBox.TextSize = 11
+    renameBox.Font = Enum.Font.Gotham
+    renameBox.Parent = scrollFrame
+    Instance.new("UICorner", renameBox).CornerRadius = UDim.new(0, 6)
+
+    local savedFilesFrame = Instance.new("ScrollingFrame")
+    savedFilesFrame.Size = UDim2.new(0.92, 0, 0, 95)
+    savedFilesFrame.BackgroundTransparency = 1
+    savedFilesFrame.ScrollBarThickness = 2
+    savedFilesFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    savedFilesFrame.Parent = scrollFrame
+
+    local filesListLayout = Instance.new("UIListLayout")
+    filesListLayout.Padding = UDim.new(0, 4)
+    filesListLayout.Parent = savedFilesFrame
+
+    local miniReplaying = false
+    local miniRecording = false
+    local miniReplayConn = nil
+    local miniRecordConn = nil
+    local miniRecordedPath = {}
+    local miniRecordStartTime = 0
+    local miniActiveVisualParts = {}
+    local miniRecordingCounter = 0
+    local miniShowPathLines = true
+    local miniSelectedFileName = nil
+
+    local function salvarArquivo()
+        SaveRoutesToFile()
+    end
+
+    local function clearVisualElements()
+        for _, obj in ipairs(miniActiveVisualParts) do
+            if obj and obj.Parent then
+                obj:Destroy()
+            end
+        end
+        miniActiveVisualParts = {}
+    end
+
+    local function renderVisualPath(pathData)
+        clearVisualElements()
+        if not miniShowPathLines or not pathData or #pathData == 0 then return end
+        local firstPoint = pathData[1]
+        if firstPoint and firstPoint.CF then
+            local startPart = Instance.new("Part")
+            startPart.Size = Vector3.new(0.8, 0.8, 0.8)
+            startPart.Shape = Enum.PartType.Ball
+            startPart.Color = Color3.fromRGB(255, 165, 0)
+            startPart.Material = Enum.Material.Neon
+            startPart.Anchored = true
+            startPart.CanCollide = false
+            startPart.Position = CFrame.new(unpack(firstPoint.CF)).Position + Vector3.new(0, 0.5, 0)
+            startPart.Parent = workspace
+            table.insert(miniActiveVisualParts, startPart)
+
+            local bb = Instance.new("BillboardGui", startPart)
+            bb.Size = UDim2.new(0, 200, 0, 50)
+            bb.StudsOffset = Vector3.new(0, 3, 0)
+            bb.AlwaysOnTop = true
+            local lbl = Instance.new("TextLabel", bb)
+            lbl.Size = UDim2.new(1, 0, 1, 0)
+            lbl.BackgroundTransparency = 1
+            lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+            lbl.TextStrokeTransparency = 0
+            lbl.TextSize = 14
+            lbl.Font = Enum.Font.GothamBold
+
+            task.spawn(function()
+                while startPart.Parent and miniShowPathLines do
+                    local char = player.Character
+                    if char and char:FindFirstChild("HumanoidRootPart") then
+                        local dist = (char.HumanoidRootPart.Position - startPart.Position).Magnitude
+                        lbl.Text = (miniSelectedFileName or "Rota") .. "\n" .. math.floor(dist) .. "m"
+                    end
+                    task.wait(0.5)
+                end
+            end)
+        end
+
+        for i = 1, #pathData - 1 do
+            local p1 = pathData[i]
+            local p2 = pathData[i + 1]
+            if p1 and p2 and p1.CF and p2.CF then
+                local cf1 = CFrame.new(unpack(p1.CF))
+                local cf2 = CFrame.new(unpack(p2.CF))
+                local part = Instance.new("Part")
+                local distance = (cf1.Position - cf2.Position).Magnitude
+                part.Size = Vector3.new(0.2, 0.2, distance)
+                part.Color = Color3.fromRGB(255, 120, 0)
+                part.Material = Enum.Material.Neon
+                part.Anchored = true
+                part.CanCollide = false
+                part.CFrame = CFrame.new(cf1.Position:Lerp(cf2.Position, 0.5), cf2.Position)
+                part.Parent = workspace
+                table.insert(miniActiveVisualParts, part)
+            end
+        end
+    end
+
+    local function updateUI()
+        for _, child in ipairs(savedFilesFrame:GetChildren()) do
+            if child:IsA("Frame") then
+                child:Destroy()
+            end
+        end
+        for name, data in pairs(SavedRoutes) do
+            local row = Instance.new("Frame")
+            row.Size = UDim2.new(1, -4, 0, 28)
+            row.BackgroundColor3 = (miniSelectedFileName == name) and Color3.fromRGB(50, 25, 0) or Color3.fromRGB(26, 26, 26)
+            row.Parent = savedFilesFrame
+            Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
+
+            local nameBtn = Instance.new("TextButton")
+            nameBtn.Size = UDim2.new(0.55, 0, 1, 0)
+            nameBtn.Position = UDim2.fromOffset(6, 0)
+            nameBtn.BackgroundTransparency = 1
+            nameBtn.Text = name
+            nameBtn.TextColor3 = Color3.fromRGB(210, 210, 210)
+            nameBtn.TextSize = 10
+            nameBtn.Font = Enum.Font.GothamSemibold
+            nameBtn.TextXAlignment = Enum.TextXAlignment.Left
+            nameBtn.Parent = row
+
+            if data and #data > 0 then
+                local durationText = formatTime(data[#data].Time)
+                local durationLabel = Instance.new("TextLabel", row)
+                durationLabel.Size = UDim2.new(0.25, 0, 1, 0)
+                durationLabel.Position = UDim2.new(0.55, 0, 0, 0)
+                durationLabel.BackgroundTransparency = 1
+                durationLabel.Text = "⏱ " .. durationText
+                durationLabel.TextColor3 = Color3.fromRGB(255, 180, 50)
+                durationLabel.TextSize = 9
+                durationLabel.Font = Enum.Font.GothamBold
+                durationLabel.TextXAlignment = Enum.TextXAlignment.Center
+            end
+
+            local delBtn = Instance.new("TextButton")
+            delBtn.Size = UDim2.fromOffset(22, 22)
+            delBtn.Position = UDim2.new(1, -26, 0.5, -11)
+            delBtn.BackgroundColor3 = Color3.fromRGB(60, 20, 20)
+            delBtn.Text = "🗑"
+            delBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
+            delBtn.TextSize = 10
+            delBtn.Parent = row
+            Instance.new("UICorner", delBtn).CornerRadius = UDim.new(0, 4)
+
+            nameBtn.MouseButton1Click:Connect(function()
+                miniSelectedFileName = name
+                renameBox.Text = name
+                updateUI()
+                renderVisualPath(SavedRoutes[name])
+                statusLabel.Text = "SELECIONADO: " .. name
+            end)
+
+            delBtn.MouseButton1Click:Connect(function()
+                if miniSelectedFileName == name then
+                    miniSelectedFileName = nil
+                    clearVisualElements()
+                end
+                SavedRoutes[name] = nil
+                updateUI()
+                salvarArquivo()
+            end)
+        end
+    end
+
+    toggleLineBtn.MouseButton1Click:Connect(function()
+        miniShowPathLines = not miniShowPathLines
+        if miniShowPathLines then
+            toggleLineBtn.Text = "LIGADO"
+            toggleLineBtn.BackgroundColor3 = Color3.fromRGB(255, 140, 0)
+            toggleLineBtn.TextColor3 = Color3.fromRGB(15, 15, 15)
+            if miniSelectedFileName and SavedRoutes[miniSelectedFileName] then
+                renderVisualPath(SavedRoutes[miniSelectedFileName])
+            end
+        else
+            toggleLineBtn.Text = "DESLIGADO"
+            toggleLineBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            toggleLineBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+            clearVisualElements()
+        end
+    end)
+
+    renameBox.FocusLost:Connect(function()
+        if miniSelectedFileName and SavedRoutes[miniSelectedFileName] and renameBox.Text ~= "" then
+            local newName = renameBox.Text
+            if not SavedRoutes[newName] and newName ~= miniSelectedFileName then
+                SavedRoutes[newName] = SavedRoutes[miniSelectedFileName]
+                SavedRoutes[miniSelectedFileName] = nil
+                miniSelectedFileName = newName
+                updateUI()
+                salvarArquivo()
+            end
+        end
+    end)
+
+    local function stopReplay(msg)
+        miniReplaying = false
+        if controls then
+            pcall(function() controls:Enable() end)
+        end
+        if miniReplayConn then
+            miniReplayConn:Disconnect()
+            miniReplayConn = nil
+        end
+        local char = player.Character
+        local rootPart = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChild("Humanoid")
+        if rootPart then
+            rootPart.AssemblyLinearVelocity = Vector3.zero
+        end
+        if hum then
+            hum.AutoRotate = true
+            hum.PlatformStand = false
+            hum:Move(Vector3.zero)
+        end
+        replayButton.Text = "▶"
+        replayButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        if msg then statusLabel.Text = msg end
+    end
+
+    local function playRecordedPath()
+        if not miniReplaying then return end
+        local char = player.Character
+        local humanoid = char and char:FindFirstChild("Humanoid")
+        local rootPart = char and char:FindFirstChild("HumanoidRootPart")
+        if not humanoid or not rootPart then
+            stopReplay("ERRO!")
+            return
+        end
+        local totalPoints = #miniRecordedPath
+        if totalPoints < 2 then
+            stopReplay("MUITO CURTO!")
+            return
+        end
+        local firstPoint = miniRecordedPath[1]
+        local startPos = rootPart.Position
+        local targetStartPos = CFrame.new(unpack(firstPoint.CF)).Position
+        local distToStart = (startPos - targetStartPos).Magnitude
+        if distToStart > 1 then
+            statusLabel.Text = "INICIANDO..."
+            humanoid.AutoRotate = true
+            humanoid.WalkSpeed = 16
+            while distToStart > 1 and miniReplaying do
+                local c = player.Character
+                local hm = c and c:FindFirstChild("Humanoid")
+                local rp = c and c:FindFirstChild("HumanoidRootPart")
+                if not hm or not rp then break end
+                targetStartPos = CFrame.new(unpack(miniRecordedPath[1].CF)).Position
+                distToStart = (rp.Position - targetStartPos).Magnitude
+                hm:MoveTo(targetStartPos)
+                RunService.Heartbeat:Wait()
+            end
+            if not miniReplaying then return end
+        end
+        humanoid.AutoRotate = false
+        statusLabel.Text = "REPRODUZINDO..."
+        local startTime = tick()
+        local currentIndex = 1
+        local lastPos = rootPart.Position
+        local lastTime = tick()
+        local isFirstFrame = true
+
+        miniReplayConn = RunService.Heartbeat:Connect(function()
+            if not miniReplaying then
+                if miniReplayConn then
+                    miniReplayConn:Disconnect()
+                    miniReplayConn = nil
+                end
+                return
+            end
+            local c = player.Character
+            humanoid = c and c:FindFirstChild("Humanoid")
+            rootPart = c and c:FindFirstChild("HumanoidRootPart")
+            if not humanoid or not rootPart then
+                stopReplay("ERRO!")
+                return
+            end
+            local elapsed = (tick() - startTime)
+            if elapsed >= miniRecordedPath[totalPoints].Time then
+                stopReplay("CONCLUÍDO!")
+                return
+            end
+            while currentIndex < totalPoints and elapsed > miniRecordedPath[currentIndex + 1].Time do
+                currentIndex = currentIndex + 1
+            end
+            local p1 = miniRecordedPath[currentIndex]
+            local p2 = miniRecordedPath[math.min(currentIndex + 1, totalPoints)]
+            if p1 and p2 and p1.CF and p2.CF then
+                local cf1 = CFrame.new(unpack(p1.CF))
+                local cf2 = CFrame.new(unpack(p2.CF))
+                local timeDiff = p2.Time - p1.Time
+                local t = timeDiff > 0 and math.clamp((elapsed - p1.Time) / timeDiff, 0, 1) or 1
+                local targetCFrame = cf1:Lerp(cf2, t)
+                local now = tick()
+                local dt = math.max(0.001, now - lastTime)
+                if isFirstFrame then
+                    lastPos = targetCFrame.Position
+                    lastTime = now
+                    isFirstFrame = false
+                end
+                local moveVector = targetCFrame.Position - lastPos
+                local horizDist = Vector3.new(moveVector.X, 0, moveVector.Z).Magnitude
+                local calculatedVelocity = moveVector / dt
+                lastPos = targetCFrame.Position
+                lastTime = now
+                rootPart.CFrame = targetCFrame
+                if horizDist > 0.05 or math.abs(moveVector.Y) > 0.1 then
+                    rootPart.AssemblyLinearVelocity = calculatedVelocity
+                    if moveVector.Y > 0.25 then
+                        humanoid.Jump = true
+                    else
+                        humanoid.Jump = false
+                    end
+                    humanoid:Move(Vector3.new(0, 0, -1), true)
+                else
+                    rootPart.AssemblyLinearVelocity = Vector3.zero
+                    humanoid.Jump = false
+                    humanoid:Move(Vector3.zero, true)
+                end
+            end
+        end)
+    end
+
+    replayButton.MouseButton1Click:Connect(function()
+        if miniReplaying then
+            stopReplay("CANCELADO")
+            return
+        end
+        if miniSelectedFileName and SavedRoutes[miniSelectedFileName] then
+            miniRecordedPath = SavedRoutes[miniSelectedFileName]
+        end
+        if #miniRecordedPath < 2 then
+            statusLabel.Text = "SELECIONAR ROTA!"
+            return
+        end
+        local rootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if not rootPart then return end
+        if controls then
+            pcall(function() controls:Disable() end)
+        end
+        miniReplaying = true
+        replayButton.Text = "⏹"
+        replayButton.BackgroundColor3 = Color3.fromRGB(150, 60, 0)
+        statusLabel.Text = "PREPARANDO..."
+        task.wait(0.05)
+        playRecordedPath()
+    end)
+
+    recordButton.MouseButton1Click:Connect(function()
+        if miniRecording then
+            miniRecording = false
+            if miniRecordConn then
+                miniRecordConn:Disconnect()
+                miniRecordConn = nil
+            end
+            recordButton.Text = "🔴"
+            recordButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+            if #miniRecordedPath > 0 then
+                miniRecordingCounter = miniRecordingCounter + 1
+                local autoName = "Gravação " .. miniRecordingCounter
+                local copy = {}
+                for i, p in ipairs(miniRecordedPath) do
+                    copy[i] = { CF = p.CF, Time = p.Time, Jumping = p.Jumping }
+                end
+                SavedRoutes[autoName] = copy
+                miniSelectedFileName = autoName
+                renameBox.Text = autoName
+                updateUI()
+                renderVisualPath(copy)
+                salvarArquivo()
+                statusLabel.Text = "SALVO: " .. autoName
+            end
+        else
+            if miniReplaying then stopReplay() end
+            local char = player.Character
+            if not char then return end
+            miniRecordedPath = {}
+            miniRecording = true
+            miniRecordStartTime = tick()
+            recordButton.Text = "⏹"
+            recordButton.BackgroundColor3 = Color3.fromRGB(150, 60, 0)
+            statusLabel.Text = "GRAVANDO..."
+            miniRecordConn = RunService.Heartbeat:Connect(function()
+                if not miniRecording then
+                    if miniRecordConn then
+                        miniRecordConn:Disconnect()
+                        miniRecordConn = nil
+                    end
+                    return
+                end
+                local rp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                local hm = player.Character and player.Character:FindFirstChild("Humanoid")
+                if rp and hm then
+                    local isJumping = hm:GetState() == Enum.HumanoidStateType.Jumping or hm:GetState() == Enum.HumanoidStateType.Freefall
+                    table.insert(miniRecordedPath, {
+                        Time = tick() - miniRecordStartTime,
+                        CF = { rp.CFrame:GetComponents() },
+                        Jumping = isJumping
+                    })
+                end
+            end)
+        end
+    end)
+
+    saveButton.MouseButton1Click:Connect(function()
+        salvarArquivo()
+        statusLabel.Text = "💾 SALVO NO ARQUIVO!"
+        task.delay(1.5, function()
+            statusLabel.Text = "PRONTO"
+        end)
+    end)
+
+    exportButton.MouseButton1Click:Connect(function()
+        if not miniSelectedFileName or not SavedRoutes[miniSelectedFileName] then
+            statusLabel.Text = "SELECIONAR ROTA!"
+            return
+        end
+        local pathData = SavedRoutes[miniSelectedFileName]
+        local codeBuilder = {}
+        table.insert(codeBuilder, "-- Script gerado pelo Sytehub para: " .. miniSelectedFileName)
+        table.insert(codeBuilder, "task.spawn(function()")
+        table.insert(codeBuilder, "local RunService = game:GetService('RunService')")
+        table.insert(codeBuilder, "local player = game:GetService('Players').LocalPlayer")
+        table.insert(codeBuilder, "local char = player.Character or player.CharacterAdded:Wait()")
+        table.insert(codeBuilder, "local humanoid = char:WaitForChild('Humanoid')")
+        table.insert(codeBuilder, "local rootPart = char:WaitForChild('HumanoidRootPart')")
+        table.insert(codeBuilder, "")
+        table.insert(codeBuilder, "local recordedPath = {")
+        for _, pt in ipairs(pathData) do
+            local cf = CFrame.new(unpack(pt.CF))
+            table.insert(codeBuilder, string.format("    {Time = %.3f, CF = {%.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f}, Jumping = %s},", pt.Time, cf.X, cf.Y, cf.Z, cf.RightVector.X, cf.RightVector.Y, cf.RightVector.Z, cf.UpVector.X, cf.UpVector.Y, cf.UpVector.Z, cf.LookVector.X, cf.LookVector.Y, cf.LookVector.Z, tostring(pt.Jumping)))
+        end
+        table.insert(codeBuilder, "}")
+        table.insert(codeBuilder, "")
+        table.insert(codeBuilder, "humanoid.AutoRotate = false")
+        table.insert(codeBuilder, "local startTime = tick()")
+        table.insert(codeBuilder, "local totalPoints = #recordedPath")
+        table.insert(codeBuilder, "local currentIndex = 1")
+        table.insert(codeBuilder, "local lastPos = rootPart.Position")
+        table.insert(codeBuilder, "local lastTime = tick()")
+        table.insert(codeBuilder, "local isFirstFrame = true")
+        table.insert(codeBuilder, "")
+        table.insert(codeBuilder, "local conn")
+        table.insert(codeBuilder, "conn = RunService.Heartbeat:Connect(function()")
+        table.insert(codeBuilder, "    local elapsed = tick() - startTime")
+        table.insert(codeBuilder, "    if elapsed >= recordedPath[totalPoints].Time then")
+        table.insert(codeBuilder, "        conn:Disconnect()")
+        table.insert(codeBuilder, "        humanoid.AutoRotate = true")
+        table.insert(codeBuilder, "        rootPart.AssemblyLinearVelocity = Vector3.zero")
+        table.insert(codeBuilder, "        return")
+        table.insert(codeBuilder, "    end")
+        table.insert(codeBuilder, "")
+        table.insert(codeBuilder, "    while currentIndex < totalPoints and elapsed > recordedPath[currentIndex + 1].Time do")
+        table.insert(codeBuilder, "        currentIndex = currentIndex + 1")
+        table.insert(codeBuilder, "    end")
+        table.insert(codeBuilder, "")
+        table.insert(codeBuilder, "    local p1 = recordedPath[currentIndex]")
+        table.insert(codeBuilder, "    local p2 = recordedPath[math.min(currentIndex + 1, totalPoints)]")
+        table.insert(codeBuilder, "    if p1 and p2 then")
+        table.insert(codeBuilder, "        local cf1 = CFrame.new(unpack(p1.CF))")
+        table.insert(codeBuilder, "        local cf2 = CFrame.new(unpack(p2.CF))")
+        table.insert(codeBuilder, "        local timeDiff = p2.Time - p1.Time")
+        table.insert(codeBuilder, "        local t = timeDiff > 0 and math.clamp((elapsed - p1.Time) / timeDiff, 0, 1) or 1")
+        table.insert(codeBuilder, "        local targetCFrame = cf1:Lerp(cf2, t)")
+        table.insert(codeBuilder, "        local now = tick()")
+        table.insert(codeBuilder, "        local dt = math.max(0.001, now - lastTime)")
+        table.insert(codeBuilder, "        if isFirstFrame then lastPos = targetCFrame.Position; lastTime = now; isFirstFrame = false end")
+        table.insert(codeBuilder, "")
+        table.insert(codeBuilder, "        local moveVector = targetCFrame.Position - lastPos")
+        table.insert(codeBuilder, "        local horizDist = Vector3.new(moveVector.X, 0, moveVector.Z).Magnitude")
+        table.insert(codeBuilder, "        local calculatedVelocity = moveVector / dt")
+        table.insert(codeBuilder, "        lastPos = targetCFrame.Position")
+        table.insert(codeBuilder, "        lastTime = now")
+        table.insert(codeBuilder, "")
+        table.insert(codeBuilder, "        rootPart.CFrame = targetCFrame")
+        table.insert(codeBuilder, "        if horizDist > 0.05 or math.abs(moveVector.Y) > 0.1 then")
+        table.insert(codeBuilder, "            rootPart.AssemblyLinearVelocity = calculatedVelocity")
+        table.insert(codeBuilder, "            if p1.Jumping then humanoid.Jump = true else humanoid.Jump = false end")
+        table.insert(codeBuilder, "            humanoid:Move(Vector3.new(0, 0, -1), true)")
+        table.insert(codeBuilder, "        else")
+        table.insert(codeBuilder, "            rootPart.AssemblyLinearVelocity = Vector3.zero")
+        table.insert(codeBuilder, "            humanoid.Jump = false")
+        table.insert(codeBuilder, "            humanoid:Move(Vector3.zero, true)")
+        table.insert(codeBuilder, "        end")
+        table.insert(codeBuilder, "    end")
+        table.insert(codeBuilder, "end)")
+        table.insert(codeBuilder, "end)")
+        local finalCode = table.concat(codeBuilder, "\n")
+        pcall(function()
+            if setclipboard then setclipboard(finalCode) end
+        end)
+        statusLabel.Text = "COPIADO!"
+        task.delay(1.5, function()
+            statusLabel.Text = "PRONTO"
+        end)
+    end)
+
+    clearButton.MouseButton1Click:Connect(function()
+        if miniRecording or miniReplaying then stopReplay() end
+        miniRecordedPath = {}
+        clearVisualElements()
+        statusLabel.Text = "LIMPO!"
+        task.delay(1.5, function()
+            statusLabel.Text = "PRONTO"
+        end)
+    end)
+
+    updateUI()
+end)
+
+-- ========== ABA 2: ESP ==========
+local EspTab = Window:CreateTab("👁️ ESP", 4483362458)
+EspTab:CreateSection("Configurações do ESP")
+
+local ESP = {
+    Enabled = false,
+    Boxes = false,
+    Lines = false,
+    Names = false,
+    Distance = false,
+    MaxDistance = 1000,
+    MaxPlayers = 10,
+    Color = Color3.fromRGB(255, 140, 0)
+}
+
+EspTab:CreateInput({
+    Name = "Quantidade de Jogadores no ESP",
+    PlaceholderText = "Ex: 10",
+    Numeric = true,
+    Finished = true,
+    Callback = function(v)
+        ESP.MaxPlayers = tonumber(v) or 10
+    end,
+})
+
+local ESP_LinesPool = {}
+local function GetOrCreateLine(index)
+    if not ESP_LinesPool[index] then
+        local line = Drawing.new("Line")
+        line.Visible = false
+        line.Color = ESP.Color
+        line.Thickness = 1
+        line.Transparency = 1
+        ESP_LinesPool[index] = line
+    end
+    return ESP_LinesPool[index]
+end
+
+local function CleanESP(char)
+    if not char then return end
+    local hl = char:FindFirstChild("Syte_ESP_Highlight")
+    local bb = char:FindFirstChild("Syte_ESP_Billboard")
+    if hl then hl:Destroy() end
+    if bb then bb:Destroy() end
+end
+
+local function ApplyESP(targetPlayer)
+    if targetPlayer == player then return end
+    local function SetupCharacter(char)
+        if not char then return end
+        CleanESP(char)
+        local root = char:WaitForChild("HumanoidRootPart", 5)
+        if not root then return end
+
+        local hl = Instance.new("Highlight")
+        hl.Name = "Syte_ESP_Highlight"
+        hl.FillColor = ESP.Color
+        hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+        hl.FillTransparency = 0.5
+        hl.Enabled = false
+        hl.Parent = char
+
+        local bb = Instance.new("BillboardGui")
+        bb.Name = "Syte_ESP_Billboard"
+        bb.Adornee = root
+        bb.Size = UDim2.new(0, 200, 0, 50)
+        bb.StudsOffset = Vector3.new(0, 3.5, 0)
+        bb.AlwaysOnTop = true
+        bb.Enabled = false
+
+        local txt = Instance.new("TextLabel")
+        txt.Name = "InfoText"
+        txt.Size = UDim2.new(1, 0, 1, 0)
+        txt.BackgroundTransparency = 1
+        txt.TextColor3 = ESP.Color
+        txt.TextSize = 13
+        txt.Font = Enum.Font.SourceSansBold
+        txt.Parent = bb
+        bb.Parent = char
+    end
+    if targetPlayer.Character then
+        SetupCharacter(targetPlayer.Character)
+    end
+    targetPlayer.CharacterAdded:Connect(SetupCharacter)
+end
+
+for _, p in pairs(Players:GetPlayers()) do
+    ApplyESP(p)
+end
+Players.PlayerAdded:Connect(ApplyESP)
+
+RunService.RenderStepped:Connect(function()
+    local myChar = player.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    local cam = Workspace.CurrentCamera
+    local sortedPlayers = {}
+
+    for _, line in pairs(ESP_LinesPool) do
+        line.Visible = false
+    end
+
+    if myRoot then
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                local hum = p.Character:FindFirstChildOfClass("Humanoid")
+                if hum and hum.Health > 0 then
+                    local root = p.Character.HumanoidRootPart
+                    local dist = (myRoot.Position - root.Position).Magnitude
+                    if dist <= ESP.MaxDistance then
+                        table.insert(sortedPlayers, {Player = p, Distance = dist})
+                    end
+                end
+            end
+        end
+        table.sort(sortedPlayers, function(a, b) return a.Distance < b.Distance end)
+    end
+
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player and p.Character then
+            local char = p.Character
+            local hl = char:FindFirstChild("Syte_ESP_Highlight")
+            local bb = char:FindFirstChild("Syte_ESP_Billboard")
+            if hl then hl.Enabled = false end
+            if bb then bb.Enabled = false end
+        end
+    end
+
+    if ESP.Enabled and #sortedPlayers > 0 then
+        local limit = math.min(ESP.MaxPlayers, #sortedPlayers)
+        for i = 1, limit do
+            local entry = sortedPlayers[i]
+            local p = entry.Player
+            if p and p.Character then
+                local char = p.Character
+                local hl = char:FindFirstChild("Syte_ESP_Highlight")
+                local bb = char:FindFirstChild("Syte_ESP_Billboard")
+                if hl then hl.Enabled = ESP.Boxes end
+                if bb then bb.Enabled = (ESP.Names or ESP.Distance) end
+
+                if ESP.Lines then
+                    local root = char:FindFirstChild("HumanoidRootPart")
+                    if root then
+                        local screenPos, onScreen = cam:WorldToViewportPoint(root.Position)
+                        if onScreen then
+                            local line = GetOrCreateLine(i)
+                            line.Visible = true
+                            line.Color = ESP.Color
+                            line.From = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y)
+                            line.To = Vector2.new(screenPos.X, screenPos.Y)
+                        end
+                    end
+                end
+
+                if myRoot then
+                    local root = char:FindFirstChild("HumanoidRootPart")
+                    if root then
+                        local dist = entry.Distance
+                        local txt = bb and bb:FindFirstChild("InfoText")
+                        if txt then
+                            local str = ""
+                            if ESP.Names then
+                                str = str .. p.Name
+                            end
+                            if ESP.Distance then
+                                str = str .. " (" .. math.floor(dist) .. "m)"
+                            end
+                            txt.Text = str
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+EspTab:CreateToggle({ Name = "Ativar ESP Geral", CurrentValue = false, Callback = function(v) ESP.Enabled = v end })
+EspTab:CreateToggle({ Name = "Caixas / Highlight", CurrentValue = false, Callback = function(v) ESP.Boxes = v end })
+EspTab:CreateToggle({ Name = "Linhas (ESP Lines)", CurrentValue = false, Callback = function(v) ESP.Lines = v end })
+EspTab:CreateToggle({ Name = "Mostrar Nomes", CurrentValue = false, Callback = function(v) ESP.Names = v end })
+EspTab:CreateToggle({ Name = "Mostrar Distância", CurrentValue = false, Callback = function(v) ESP.Distance = v end })
+
+-- ========== ABA 3: RÁDIO ==========
+local MusicTab = Window:CreateTab("🎵 Rádio", 4483362458)
+MusicTab:CreateSection("Tocador de Música")
+
+local Music_System = {
+    SoundId = "9043887091",
+    Volume = 1,
+    Instance = nil
+}
+
+MusicTab:CreateInput({
+    Name = "ID do Áudio",
+    PlaceholderText = "Dígito ou ID",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(text)
+        if text ~= "" then
+            Music_System.SoundId = text
+        end
+    end,
+})
+
+MusicTab:CreateButton({
+    Name = "▶ Tocar Música",
+    Callback = function()
+        if Music_System.Instance then
+            Music_System.Instance:Destroy()
+        end
+        local cleanID = string.match(tostring(Music_System.SoundId), "%d+")
+        if cleanID then
+            local sound = Instance.new("Sound")
+            sound.SoundId = "rbxassetid://" .. cleanID
+            sound.Volume = Music_System.Volume
+            sound.Looped = true
+            sound.Parent = SoundService
+            sound:Play()
+            Music_System.Instance = sound
+        end
+    end,
+})
+
+MusicTab:CreateButton({
+    Name = "⏹ Parar Música",
+    Callback = function()
+        if Music_System.Instance then
+            Music_System.Instance:Destroy()
+        end
+    end,
+})
+
+-- ========== ABA 4: COMBATE (AIMBOT MELHORADO) ==========
+local CombatTab = Window:CreateTab("⚔️ Combate", 4483362458)
+CombatTab:CreateSection("Aimbot Profissional")
+
+local aimbot = {
+    enabled = false,
+    smoothness = 0.25,
+    fov = 120,
+    range = 300,
+    targetPart = "Tronco", -- "Cabeça" ou "Tronco"
+    silent = false,
+    wallCheck = false,
+    teamCheck = true,
+    showFOV = false,
+    prediction = false, -- mira à frente (lead)
+    predictionAmount = 0.2, -- fator de predição
+}
+
+local aimbotConn = nil
+local fovCircle = nil
+
+-- Verificar time
+local function isEnemy(target)
+    if not aimbot.teamCheck then return true end
+    local myTeam = player.Team
+    local targetTeam = target.Team
+    if myTeam and targetTeam then
+        return myTeam ~= targetTeam
+    end
+    return true
+end
+
+-- Wall check
+local function canSee(targetPos)
+    if not aimbot.wallCheck then return true end
+    local cam = Workspace.CurrentCamera
+    local origin = cam.CFrame.Position
+    local ray = Ray.new(origin, (targetPos - origin).Unit * aimbot.range)
+    local hit = Workspace:FindPartOnRayWithIgnoreList(ray, {player.Character, cam})
+    if hit then
+        local dist = (hit.Position - origin).Magnitude
+        return dist > (targetPos - origin).Magnitude - 1
+    end
+    return true
+end
+
+-- Obter alvo mais próximo com pontuação
+local function getClosestTarget()
+    local cam = Workspace.CurrentCamera
+    if not cam then return nil end
+    local center = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
+    local closest = nil
+    local closestScore = math.huge
+    local myPos = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if not myPos then return nil end
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            if not isEnemy(plr) then continue end
+            local root = plr.Character.HumanoidRootPart
+            local head = plr.Character:FindFirstChild("Head")
+            local targetPos
+            if aimbot.targetPart == "Cabeça" and head then
+                targetPos = head.Position - Vector3.new(0, 1.5, 0) -- offset para o centro do tronco
+            else
+                targetPos = root.Position
+            end
+            if not targetPos then continue end
+
+            -- Predição (lead) para alvos em movimento
+            if aimbot.prediction then
+                local vel = root.AssemblyLinearVelocity
+                if vel.Magnitude > 1 then
+                    targetPos = targetPos + vel * aimbot.predictionAmount
+                end
+            end
+
+            local dist = (targetPos - myPos.Position).Magnitude
+            if dist > aimbot.range then continue end
+            if not canSee(targetPos) then continue end
+            local screenPos, onScreen = cam:WorldToScreenPoint(targetPos)
+            if onScreen then
+                local fovDist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                if fovDist < aimbot.fov then
+                    local score = fovDist + dist * 0.01
+                    if score < closestScore then
+                        closestScore = score
+                        closest = { Position = targetPos }
+                    end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- Iniciar aimbot (com suavidade melhorada)
+local function startAimbot()
+    if aimbotConn then aimbotConn:Disconnect(); aimbotConn = nil end
+    if not aimbot.enabled then return end
+    aimbotConn = RunService.RenderStepped:Connect(function()
+        if not aimbot.enabled then return end
+        local target = getClosestTarget()
+        if target and target.Position then
+            local cam = Workspace.CurrentCamera
+            local targetPos = target.Position
+            local newCF = CFrame.new(cam.CFrame.Position, targetPos)
+            -- Suavidade via lerp com fator de suavidade
+            cam.CFrame = cam.CFrame:Lerp(newCF, aimbot.smoothness)
         end
     end)
 end
 
--- ==============================================================================
--- 9. INITIALIZATION BOOTSTRAP
--- ==============================================================================
-SyteUI:BuildInterface()
-print("[SytéHub Enterprise] Kernel v4.5.0 carregado com sucesso.")
+-- Interface do Rayfield
+CombatTab:CreateToggle({
+    Name = "Aimbot Ativo",
+    CurrentValue = false,
+    Callback = function(state)
+        aimbot.enabled = state
+        if state then startAimbot() else if aimbotConn then aimbotConn:Disconnect(); aimbotConn = nil end end
+    end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Suavidade",
+    Range = {0.05, 0.6},
+    Increment = 0.05,
+    Suffix = "",
+    CurrentValue = 0.25,
+    Callback = function(v) aimbot.smoothness = v end,
+})
+
+CombatTab:CreateSlider({
+    Name = "FOV",
+    Range = {30, 200},
+    Increment = 5,
+    Suffix = "°",
+    CurrentValue = 120,
+    Callback = function(v) aimbot.fov = v end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Alcance",
+    Range = {50, 500},
+    Increment = 10,
+    Suffix = "m",
+    CurrentValue = 300,
+    Callback = function(v) aimbot.range = v end,
+})
+
+CombatTab:CreateDropdown({
+    Name = "Alvo",
+    Options = {"Cabeça", "Tronco"},
+    CurrentOption = "Tronco",
+    Callback = function(opt) aimbot.targetPart = opt end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Silent Aim",
+    CurrentValue = false,
+    Callback = function(state) aimbot.silent = state end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Wall Check",
+    CurrentValue = false,
+    Callback = function(state) aimbot.wallCheck = state end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Verificar Time",
+    CurrentValue = true,
+    Callback = function(state) aimbot.teamCheck = state end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Predição (Lead)",
+    CurrentValue = false,
+    Callback = function(state) aimbot.prediction = state end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Fator de Predição",
+    Range = {0.05, 0.5},
+    Increment = 0.05,
+    Suffix = "",
+    CurrentValue = 0.2,
+    Callback = function(v) aimbot.predictionAmount = v end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Mostrar FOV Circle",
+    CurrentValue = false,
+    Callback = function(state)
+        aimbot.showFOV = state
+        if state then
+            if not fovCircle then
+                fovCircle = Drawing.new("Circle")
+                fovCircle.Visible = true
+                fovCircle.Radius = aimbot.fov
+                fovCircle.Thickness = 1
+                fovCircle.Color = Color3.fromRGB(255, 255, 255)
+                fovCircle.Filled = false
+                fovCircle.NumSides = 32
+                fovCircle.Position = Vector2.new(Workspace.CurrentCamera.ViewportSize.X / 2, Workspace.CurrentCamera.ViewportSize.Y / 2)
+            end
+        else
+            if fovCircle then fovCircle.Visible = false; fovCircle = nil end
+        end
+    end,
+})
+
+RunService.RenderStepped:Connect(function()
+    if aimbot.showFOV and fovCircle then
+        local cam = Workspace.CurrentCamera
+        fovCircle.Position = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
+        fovCircle.Radius = aimbot.fov
+        fovCircle.Visible = true
+    elseif fovCircle then
+        fovCircle.Visible = false
+    end
+end)
+
+CombatTab:CreateSection("Wall Hack")
+local wallhackActive = false
+local wallhackESP = {}
+
+CombatTab:CreateToggle({
+    Name = "Wall Hack (ESP)",
+    CurrentValue = false,
+    Callback = function(state)
+        wallhackActive = state
+        if state then
+            local function addESP(plr)
+                if plr == player or wallhackESP[plr] then return end
+                local function createESP(char)
+                    task.wait(0.3)
+                    if not wallhackActive or not char.Parent then return end
+                    local head = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
+                    if not head then return end
+                    local bill = Instance.new("BillboardGui")
+                    bill.Size = UDim2.new(0, 100, 0, 30)
+                    bill.Adornee = head
+                    bill.AlwaysOnTop = true
+                    bill.Parent = char
+                    local lbl = Instance.new("TextLabel")
+                    lbl.Size = UDim2.new(1, 0, 1, 0)
+                    lbl.BackgroundTransparency = 1
+                    lbl.Text = plr.Name
+                    lbl.TextColor3 = Color3.fromRGB(255, 80, 80)
+                    lbl.TextSize = 14
+                    lbl.Font = Enum.Font.GothamBold
+                    lbl.TextStrokeTransparency = 0.3
+                    lbl.Parent = bill
+                    wallhackESP[plr] = bill
+                end
+                plr.CharacterAdded:Connect(createESP)
+                if plr.Character then createESP(plr.Character) end
+            end
+            for _, plr in ipairs(Players:GetPlayers()) do addESP(plr) end
+            local conn1 = Players.PlayerAdded:Connect(addESP)
+            local conn2 = Players.PlayerRemoving:Connect(function(p)
+                if wallhackESP[p] then wallhackESP[p]:Destroy(); wallhackESP[p] = nil end
+            end)
+            _G.Syte_WH_1 = conn1
+            _G.Syte_WH_2 = conn2
+        else
+            for _, bill in pairs(wallhackESP) do if bill then bill:Destroy() end end
+            wallhackESP = {}
+            if _G.Syte_WH_1 then _G.Syte_WH_1:Disconnect() end
+            if _G.Syte_WH_2 then _G.Syte_WH_2:Disconnect() end
+        end
+    end,
+})
+
+-- ========== NOVA ABA: NOCLIP (COM MINI-HUB) ==========
+local NoClipTab = Window:CreateTab("🎮 NoClip", 4483362458)
+NoClipTab:CreateSection("Mini-Hub Flutuante")
+
+local noClipHubToggle = NoClipTab:CreateToggle({
+    Name = "📱 Ativar Mini-Hub NoClip",
+    CurrentValue = false,
+    Callback = function(v)
+        if _G.Syte_NoClipHub then
+            _G.Syte_NoClipHub.Enabled = v
+        end
+    end,
+})
+
+-- Criar mini-hub NoClip
+task.spawn(function()
+    if CoreGui:FindFirstChild("Syte_NoClipHub") then
+        CoreGui.Syte_NoClipHub:Destroy()
+    end
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "Syte_NoClipHub"
+    screenGui.ResetOnSpawn = false
+    screenGui.IgnoreGuiInset = true
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    pcall(function()
+        if gethui then
+            screenGui.Parent = gethui()
+        else
+            screenGui.Parent = CoreGui
+        end
+    end)
+    if not screenGui.Parent then
+        screenGui.Parent = player:WaitForChild("PlayerGui")
+    end
+    _G.Syte_NoClipHub = screenGui
+    screenGui.Enabled = false
+
+    local hub = Instance.new("Frame")
+    hub.Size = UDim2.new(0, 200, 0, 210)
+    hub.Position = UDim2.new(0, 20, 0.5, -105)
+    hub.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+    hub.BackgroundTransparency = 0.1
+    hub.BorderSizePixel = 0
+    hub.ClipsDescendants = true
+    hub.Visible = true
+    hub.Parent = screenGui
+    Instance.new("UICorner", hub).CornerRadius = UDim.new(0, 12)
+
+    local hubStroke = Instance.new("UIStroke", hub)
+    hubStroke.Color = Color3.fromRGB(255, 120, 0)
+    hubStroke.Thickness = 1.5
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 30)
+    title.BackgroundTransparency = 1
+    title.Text = "⚡ NoClip"
+    title.TextColor3 = Color3.fromRGB(255, 140, 0)
+    title.TextSize = 14
+    title.Font = Enum.Font.GothamBold
+    title.Parent = hub
+
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0, 24, 0, 24)
+    closeBtn.Position = UDim2.new(1, -28, 0, 3)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    closeBtn.Text = "×"
+    closeBtn.TextColor3 = Color3.fromRGB(255, 140, 0)
+    closeBtn.TextSize = 12
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.Parent = title
+    Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
+    closeBtn.MouseButton1Click:Connect(function()
+        screenGui.Enabled = false
+        noClipHubToggle:Set(false)
+    end)
+
+    local function dirBtn(text, x, y, dir)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0, 44, 0, 44)
+        btn.Position = UDim2.new(0, x, 0, y)
+        btn.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
+        btn.Text = text
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.TextSize = 18
+        btn.Font = Enum.Font.GothamBold
+        btn.BorderSizePixel = 0
+        btn.Parent = hub
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+        btn.MouseButton1Down:Connect(function()
+            local char = player.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                local speed = 25
+                char.HumanoidRootPart.Position = char.HumanoidRootPart.Position + (dir * speed)
+            end
+        end)
+    end
+
+    dirBtn("↑", 78, 35, Vector3.new(0, 0, -1))
+    dirBtn("↓", 78, 121, Vector3.new(0, 0, 1))
+    dirBtn("←", 20, 78, Vector3.new(-1, 0, 0))
+    dirBtn("→", 136, 78, Vector3.new(1, 0, 0))
+    dirBtn("⬆", 78, 78, Vector3.new(0, 1, 0))
+    dirBtn("⬇", 78, 164, Vector3.new(0, -1, 0))
+
+    local noclipToggle = Instance.new("TextButton")
+    noclipToggle.Size = UDim2.new(0.8, 0, 0, 30)
+    noclipToggle.Position = UDim2.new(0.1, 0, 1, -36)
+    noclipToggle.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+    noclipToggle.Text = "NoClip OFF"
+    noclipToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    noclipToggle.TextSize = 12
+    noclipToggle.Font = Enum.Font.GothamBold
+    noclipToggle.Parent = hub
+    Instance.new("UICorner", noclipToggle).CornerRadius = UDim.new(0, 6)
+
+    local noclipState = false
+    local noclipConn = nil
+
+    noclipToggle.MouseButton1Click:Connect(function()
+        noclipState = not noclipState
+        noclipToggle.BackgroundColor3 = noclipState and Color3.fromRGB(60, 200, 60) or Color3.fromRGB(200, 60, 60)
+        noclipToggle.Text = noclipState and "NoClip ON" or "NoClip OFF"
+        if noclipState then
+            if noclipConn then noclipConn:Disconnect() end
+            noclipConn = RunService.Heartbeat:Connect(function()
+                local char = player.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    char.HumanoidRootPart.CanCollide = false
+                end
+            end)
+        else
+            if noclipConn then noclipConn:Disconnect(); noclipConn = nil end
+            local char = player.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                char.HumanoidRootPart.CanCollide = true
+            end
+        end
+    end)
+
+    -- Arrastar
+    local dragging, dragInput, dragStart, startPos
+    hub.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = hub.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    hub.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            hub.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+
+    noClipHubToggle:Set(false)
+end)
+
+-- ========== ABA 5: CRÉDITOS ==========
+local CreditTab = Window:CreateTab("ℹ️ Créditos", 4483362458)
+CreditTab:CreateSection("Desenvolvedor")
+CreditTab:CreateLabel("Hub: Sytehub")
+CreditTab:CreateLabel("Desenvolvedor: Syté")
+CreditTab:CreateLabel("Versão: 2.0")
+
+print("✅ Sytehub carregado com sucesso!")
