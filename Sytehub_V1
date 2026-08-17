@@ -1191,7 +1191,7 @@ MusicTab:CreateButton({
     end,
 })
 
--- ========== ABA 4: COMBATE (AIMBOT PROFISSIONAL) ==========
+-- ========== ABA 4: COMBATE (COM CALIBRAGEM DE OFFSET) ==========
 local CombatTab = Window:CreateTab("⚔️ Combate", 4483362458)
 CombatTab:CreateSection("Aimbot")
 
@@ -1207,10 +1207,40 @@ local aimbot = {
     prediction = false,
     predictionAmount = 0.2,
     showFOV = false,
+    -- OFFSET DA MIRA
+    offsetX = 0,
+    offsetY = -1.5, -- padrão para a maioria dos jogos
+    offsetZ = 0,
+    useAutoOffset = true, -- detecta automaticamente pelo nome do jogo
 }
 
 local aimbotConn = nil
 local fovCircle = nil
+
+-- ===== DETECÇÃO AUTOMÁTICA DE OFFSET =====
+local function getAutoOffset()
+    local gameName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name or ""
+    local lowerName = string.lower(gameName)
+    
+    local knownOffsets = {
+        ["army"] = Vector3.new(0, -1.5, 0),
+        ["military"] = Vector3.new(0, -1.5, 0),
+        ["combat"] = Vector3.new(0, -1.2, 0),
+        ["arsenal"] = Vector3.new(0, 0, 0),
+        ["phantom"] = Vector3.new(0, -1.8, 0),
+        ["bad business"] = Vector3.new(0, -1.5, 0),
+        ["counter blox"] = Vector3.new(0, -1.5, 0),
+        ["aimblox"] = Vector3.new(0, -1.2, 0),
+        ["typical colors"] = Vector3.new(0, -1.2, 0),
+    }
+    
+    for key, offset in pairs(knownOffsets) do
+        if string.find(lowerName, key) then
+            return offset
+        end
+    end
+    return Vector3.new(0, -1.5, 0) -- padrão
+end
 
 -- ===== VERIFICA TIME =====
 local function isEnemy(target)
@@ -1237,7 +1267,7 @@ local function canSee(targetPos)
     return true
 end
 
--- ===== OBTEM O ALVO =====
+-- ===== OBTEM O ALVO COM OFFSET =====
 local function getClosestTarget()
     local cam = Workspace.CurrentCamera
     if not cam then return nil end
@@ -1246,6 +1276,14 @@ local function getClosestTarget()
     local closestScore = math.huge
     local myPos = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     if not myPos then return nil end
+
+    -- Calcula o offset atual
+    local offset
+    if aimbot.useAutoOffset then
+        offset = getAutoOffset()
+    else
+        offset = Vector3.new(aimbot.offsetX, aimbot.offsetY, aimbot.offsetZ)
+    end
 
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
@@ -1256,9 +1294,9 @@ local function getClosestTarget()
             local targetPos
             
             if aimbot.target == "Head" and head then
-                targetPos = head.Position - Vector3.new(0, 1.5, 0) -- offset padrão para centralizar
+                targetPos = head.Position + offset
             else
-                targetPos = root.Position
+                targetPos = root.Position + offset
             end
             
             if not targetPos then continue end
@@ -1350,6 +1388,70 @@ CombatTab:CreateDropdown({
     CurrentOption = "Torso",
     Callback = function(opt) aimbot.target = opt end,
 })
+
+CombatTab:CreateSection("Calibragem da Mira (Offset)")
+
+CombatTab:CreateToggle({
+    Name = "Offset Automático",
+    CurrentValue = true,
+    Callback = function(state)
+        aimbot.useAutoOffset = state
+        if state then
+            print("✅ Offset automático ativado")
+        else
+            print("ℹ️ Use os sliders abaixo para ajustar manualmente")
+        end
+    end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Offset X",
+    Range = {-5, 5},
+    Increment = 0.1,
+    Suffix = "",
+    CurrentValue = 0,
+    Callback = function(v)
+        aimbot.offsetX = v
+        print("🔄 Offset X: " .. v)
+    end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Offset Y (Vertical)",
+    Range = {-5, 5},
+    Increment = 0.1,
+    Suffix = "",
+    CurrentValue = -1.5,
+    Callback = function(v)
+        aimbot.offsetY = v
+        print("🔄 Offset Y: " .. v)
+    end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Offset Z (Profundidade)",
+    Range = {-5, 5},
+    Increment = 0.1,
+    Suffix = "",
+    CurrentValue = 0,
+    Callback = function(v)
+        aimbot.offsetZ = v
+        print("🔄 Offset Z: " .. v)
+    end,
+})
+
+CombatTab:CreateButton({
+    Name = "🔁 Resetar Offset",
+    Callback = function()
+        aimbot.offsetX = 0
+        aimbot.offsetY = -1.5
+        aimbot.offsetZ = 0
+        aimbot.useAutoOffset = true
+        print("✅ Offset resetado para padrão (-1.5 Y, auto-detecção ativada)")
+    end,
+})
+
+CombatTab:CreateSection("Configurações Avançadas")
 
 CombatTab:CreateToggle({
     Name = "Silent Aim",
