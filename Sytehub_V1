@@ -961,7 +961,7 @@ task.spawn(function()
     updateUI()
 end)
 
--- ========== ABA 2: ESP (COM CORES POR TIME) ==========
+-- ========== ABA 2: ESP (COM CORES POR TIME - VERSÃO COMPATÍVEL) ==========
 local EspTab = Window:CreateTab("👁️ ESP", 4483362458)
 EspTab:CreateSection("Configurações do ESP")
 
@@ -994,16 +994,41 @@ EspTab:CreateToggle({
     Callback = function(v) ESP.ShowTeamColors = v end,
 })
 
-EspTab:CreateColorPicker({
+-- CORES DOS ALIADOS (Dropdown)
+EspTab:CreateDropdown({
     Name = "Cor dos Aliados",
-    CurrentValue = ESP.TeamColor,
-    Callback = function(v) ESP.TeamColor = v end,
+    Options = {"Verde", "Azul", "Ciano", "Branco", "Amarelo", "Laranja", "Rosa"},
+    CurrentOption = "Verde",
+    Callback = function(opt)
+        local colors = {
+            Verde = Color3.fromRGB(0, 255, 100),
+            Azul = Color3.fromRGB(50, 100, 255),
+            Ciano = Color3.fromRGB(0, 255, 255),
+            Branco = Color3.fromRGB(255, 255, 255),
+            Amarelo = Color3.fromRGB(255, 255, 0),
+            Laranja = Color3.fromRGB(255, 165, 0),
+            Rosa = Color3.fromRGB(255, 100, 200),
+        }
+        ESP.TeamColor = colors[opt] or Color3.fromRGB(0, 255, 100)
+    end,
 })
 
-EspTab:CreateColorPicker({
+-- CORES DOS INIMIGOS (Dropdown)
+EspTab:CreateDropdown({
     Name = "Cor dos Inimigos",
-    CurrentValue = ESP.EnemyColor,
-    Callback = function(v) ESP.EnemyColor = v end,
+    Options = {"Vermelho", "Laranja", "Rosa", "Amarelo", "Branco", "Roxo"},
+    CurrentOption = "Vermelho",
+    Callback = function(opt)
+        local colors = {
+            Vermelho = Color3.fromRGB(255, 50, 50),
+            Laranja = Color3.fromRGB(255, 165, 0),
+            Rosa = Color3.fromRGB(255, 100, 200),
+            Amarelo = Color3.fromRGB(255, 255, 0),
+            Branco = Color3.fromRGB(255, 255, 255),
+            Roxo = Color3.fromRGB(150, 50, 255),
+        }
+        ESP.EnemyColor = colors[opt] or Color3.fromRGB(255, 50, 50)
+    end,
 })
 
 local ESP_LinesPool = {}
@@ -1690,6 +1715,7 @@ CombatTab:CreateParagraph({
     Title = "📖 Como Usar",
     Content = "1. Ative o 'Silent Aim Universal'.\n2. O menu do Silent Aim abrirá automaticamente.\n3. Você pode ajustar FOV, Suavidade, e outras opções.\n4. Se o menu não abrir, pressione a tecla 'RightAlt' (Alt Direito) no seu teclado.\n\nO script é universal e funciona na maioria dos jogos com raycasting."
 })
+
 -- ========== NOVA ABA: NOCLIP (COM MINI-HUB) ==========
 local NoClipTab = Window:CreateTab("🎮 NoClip", 4483362458)
 NoClipTab:CreateSection("Mini-Hub Flutuante")
