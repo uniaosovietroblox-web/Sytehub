@@ -1570,143 +1570,52 @@ CombatTab:CreateToggle({
     end,
 })
 
--- ===== CALIBRAGEM DA MIRA (AJUSTE VISUAL) =====
-CombatTab:CreateSection("Calibragem da Mira")
+-- ===== AJUSTE DA MIRA (OFFSET VERTICAL) =====
+CombatTab:CreateSection("Ajuste da Mira")
 
--- Posição da mira em porcentagem da tela (padrão: centro)
-local aimPosition = {
-    x = 0.5,
-    y = 0.42, -- 0.42 = um pouco acima do centro (padrão para a maioria dos FPS mobile)
-    useCalibrated = false,
-}
+local aimOffsetY = -0.08 -- valor em porcentagem da tela (negativo = para cima)
 
-local calibrationGui = nil
-local calibrationDot = nil
-local isDragging = false
-local calibrationMode = false
+-- Slider para ajustar a altura da mira
+CombatTab:CreateSlider({
+    Name = "Altura da Mira (Y)",
+    Range = {-0.25, 0.25},
+    Increment = 0.005,
+    Suffix = "",
+    CurrentValue = aimOffsetY,
+    Callback = function(v)
+        aimOffsetY = v
+        print("🔄 Altura da mira ajustada para: " .. string.format("%.3f", v))
+    end,
+})
 
--- ===== CRIA O PONTO DE CALIBRAÇÃO =====
-local function createCalibrationDot()
-    if calibrationGui then calibrationGui:Destroy() end
-    
-    calibrationGui = Instance.new("ScreenGui")
-    calibrationGui.Name = "Syte_Calibration"
-    calibrationGui.ResetOnSpawn = false
-    calibrationGui.IgnoreGuiInset = true
-    calibrationGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    pcall(function()
-        if gethui then
-            calibrationGui.Parent = gethui()
-        else
-            calibrationGui.Parent = CoreGui
-        end
-    end)
-    if not calibrationGui.Parent then
-        calibrationGui.Parent = player:WaitForChild("PlayerGui")
-    end
-    calibrationGui.Enabled = false
+-- Botão para resetar
+CombatTab:CreateButton({
+    Name = "🔄 Resetar para Centro",
+    Callback = function()
+        aimOffsetY = 0
+        print("✅ Mira resetada para o centro")
+    end,
+})
 
-    calibrationDot = Instance.new("Frame")
-    calibrationDot.Size = UDim2.new(0, 24, 0, 24)
-    calibrationDot.Position = UDim2.new(aimPosition.x - 0.012, 0, aimPosition.y - 0.012, 0)
-    calibrationDot.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-    calibrationDot.BorderSizePixel = 2
-    calibrationDot.BorderColor3 = Color3.fromRGB(255, 255, 255)
-    calibrationDot.BackgroundTransparency = 0.2
-    calibrationDot.Parent = calibrationGui
-    calibrationDot.ZIndex = 100
-    Instance.new("UICorner", calibrationDot).CornerRadius = UDim.new(0, 12)
-    calibrationDot.Active = true
-    calibrationDot.Draggable = false
-
-    -- Círculo externo
-    local outerCircle = Instance.new("Frame")
-    outerCircle.Size = UDim2.new(0, 44, 0, 44)
-    outerCircle.Position = UDim2.new(0.5, -22, 0.5, -22)
-    outerCircle.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-    outerCircle.BackgroundTransparency = 0.85
-    outerCircle.BorderSizePixel = 1
-    outerCircle.BorderColor3 = Color3.fromRGB(255, 0, 0)
-    outerCircle.Parent = calibrationDot
-    Instance.new("UICorner", outerCircle).CornerRadius = UDim.new(0, 22)
-
-    -- Label
-    local instruction = Instance.new("TextLabel")
-    instruction.Size = UDim2.new(0, 260, 0, 30)
-    instruction.Position = UDim2.new(0.5, -130, 1, 10)
-    instruction.BackgroundTransparency = 1
-    instruction.Text = "Arraste o ponto para a MIRA DO JOGO"
-    instruction.TextColor3 = Color3.fromRGB(255, 255, 255)
-    instruction.TextSize = 14
-    instruction.Font = Enum.Font.GothamBold
-    instruction.TextStrokeTransparency = 0.2
-    instruction.Parent = calibrationDot
-
-    -- Arrasto com TOQUE e MOUSE
-    local function startDrag(input)
-        isDragging = true
-        local startPos = input.Position
-        local framePos = calibrationDot.Position
-        
-        local dragConn
-        dragConn = UserInputService.InputChanged:Connect(function(input2)
-            if input2.UserInputType == Enum.UserInputType.MouseMovement or input2.UserInputType == Enum.UserInputType.Touch then
-                if isDragging then
-                    local delta = input2.Position - startPos
-                    local newX = framePos.X.Scale + (delta.X / calibrationGui.AbsoluteSize.X)
-                    local newY = framePos.Y.Scale + (delta.Y / calibrationGui.AbsoluteSize.Y)
-                    newX = math.clamp(newX, 0, 1 - 0.024)
-                    newY = math.clamp(newY, 0, 1 - 0.024)
-                    calibrationDot.Position = UDim2.new(newX, 0, newY, 0)
-                    aimPosition.x = newX + 0.012
-                    aimPosition.y = newY + 0.012
-                end
-            end
-        end)
-        
-        local endConn
-        endConn = UserInputService.InputEnded:Connect(function(input2)
-            if input2 == input then
-                isDragging = false
-                dragConn:Disconnect()
-                endConn:Disconnect()
-                print("✅ Posição calibrada: X=" .. string.format("%.3f", aimPosition.x) .. " Y=" .. string.format("%.3f", aimPosition.y))
-            end
-        end)
-    end
-
-    calibrationDot.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            startDrag(input)
-        end
-    end)
-
-    calibrationGui.Enabled = true
-end
-
--- ===== FUNÇÃO MODIFICADA PARA USAR A POSIÇÃO CALIBRADA =====
-local function getCalibratedAimPosition()
-    if not aimPosition.useCalibrated then
-        -- Se não estiver usando calibragem, retorna o centro
-        local cam = Workspace.CurrentCamera
-        if not cam then return Vector2.new(0, 0) end
-        return Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
-    end
+-- Função que retorna a posição da mira (centro + offset Y)
+local function getAimPosition()
     local cam = Workspace.CurrentCamera
     if not cam then return Vector2.new(0, 0) end
-    return Vector2.new(
-        aimPosition.x * cam.ViewportSize.X,
-        aimPosition.y * cam.ViewportSize.Y
-    )
+    local center = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
+    return Vector2.new(center.X, center.Y + (aimOffsetY * cam.ViewportSize.Y))
 end
 
--- ===== FUNÇÃO QUE ENCONTRA O ALVO MAIS PRÓXIMO DA POSIÇÃO CALIBRADA =====
-local function getTargetNearCalibratedAim()
+-- ===== MODIFICA A FUNÇÃO getClosestTarget PARA USAR A POSIÇÃO AJUSTADA =====
+-- Salva a função original
+local originalGetClosestTarget = getClosestTarget
+
+-- Sobrescreve a função getClosestTarget
+getClosestTarget = function()
     local cam = Workspace.CurrentCamera
     if not cam then return nil end
-    local aimPos = getCalibratedAimPosition()
+    local aimPos = getAimPosition()
     local closest = nil
-    local closestDist = math.huge
+    local closestScore = math.huge
     local myPos = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     if not myPos then return nil end
 
@@ -1723,13 +1632,16 @@ local function getTargetNearCalibratedAim()
             local root = plr.Character.HumanoidRootPart
             local head = plr.Character:FindFirstChild("Head")
             local targetPos = root.Position + offset
-            
+
             local screenPos, onScreen = cam:WorldToScreenPoint(targetPos)
             if onScreen then
                 local dist = (Vector2.new(screenPos.X, screenPos.Y) - aimPos).Magnitude
-                if dist < closestDist then
-                    closestDist = dist
-                    closest = { Position = targetPos, Player = plr }
+                if dist < aimbot.fov then
+                    local score = dist + (targetPos - myPos.Position).Magnitude * 0.01
+                    if score < closestScore then
+                        closestScore = score
+                        closest = { Position = targetPos }
+                    end
                 end
             end
         end
@@ -1737,144 +1649,16 @@ local function getTargetNearCalibratedAim()
     return closest
 end
 
--- ===== AIMBOT COM POSIÇÃO CALIBRADA =====
-local calibratedAimbotActive = false
-local calibratedAimbotConn = nil
+-- ===== SILENT AIM TAMBÉM USA A POSIÇÃO AJUSTADA =====
+-- O silent aim já usa a função getClosestTarget, então automaticamente herdará a mudança
 
-local function startCalibratedAimbot()
-    if calibratedAimbotConn then calibratedAimbotConn:Disconnect(); calibratedAimbotConn = nil end
-    if not calibratedAimbotActive then return end
-    
-    calibratedAimbotConn = RunService.RenderStepped:Connect(function()
-        if not calibratedAimbotActive then return end
-        local target = getTargetNearCalibratedAim()
-        if target and target.Position then
-            local cam = Workspace.CurrentCamera
-            local newCF = CFrame.new(cam.CFrame.Position, target.Position)
-            cam.CFrame = cam.CFrame:Lerp(newCF, aimbot.smoothness)
-        end
-    end)
-end
-
--- ===== INTERFACE DE CALIBRAGEM =====
-CombatTab:CreateToggle({
-    Name = "🔴 Modo Calibração (Arraste o ponto)",
-    CurrentValue = false,
-    Callback = function(state)
-        calibrationMode = state
-        if state then
-            createCalibrationDot()
-            print("🔴 Modo calibração ativado. Arraste o ponto vermelho até a mira do jogo.")
-        else
-            if calibrationGui then calibrationGui:Destroy(); calibrationGui = nil end
-            calibrationDot = nil
-        end
-    end,
-})
-
-CombatTab:CreateToggle({
-    Name = "🎯 Usar Posição Calibrada",
-    CurrentValue = false,
-    Callback = function(state)
-        aimPosition.useCalibrated = state
-        if state then
-            print("✅ Aimbot usando posição calibrada: X=" .. string.format("%.3f", aimPosition.x) .. " Y=" .. string.format("%.3f", aimPosition.y))
-        else
-            print("ℹ️ Aimbot usando centro da tela")
-        end
-    end,
-})
-
-CombatTab:CreateSlider({
-    Name = "Ajuste Fino X",
-    Range = {0.01, 0.99},
-    Increment = 0.005,
-    Suffix = "",
-    CurrentValue = aimPosition.x,
-    Callback = function(v)
-        aimPosition.x = v
-        if calibrationDot then
-            calibrationDot.Position = UDim2.new(v - 0.012, 0, aimPosition.y - 0.012, 0)
-        end
-        if aimPosition.useCalibrated then
-            print("🔄 Posição X atualizada: " .. string.format("%.3f", v))
-        end
-    end,
-})
-
-CombatTab:CreateSlider({
-    Name = "Ajuste Fino Y",
-    Range = {0.01, 0.99},
-    Increment = 0.005,
-    Suffix = "",
-    CurrentValue = aimPosition.y,
-    Callback = function(v)
-        aimPosition.y = v
-        if calibrationDot then
-            calibrationDot.Position = UDim2.new(aimPosition.x - 0.012, 0, v - 0.012, 0)
-        end
-        if aimPosition.useCalibrated then
-            print("🔄 Posição Y atualizada: " .. string.format("%.3f", v))
-        end
-    end,
-})
-
-CombatTab:CreateButton({
-    Name = "📌 Salvar Posição Atual",
-    Callback = function()
-        print("✅ Posição salva: X=" .. string.format("%.3f", aimPosition.x) .. " Y=" .. string.format("%.3f", aimPosition.y))
-        aimPosition.useCalibrated = true
-        print("🎯 Aimbot agora usa a posição calibrada!")
-    end,
-})
-
-CombatTab:CreateToggle({
-    Name = "🎯 Aimbot na Mira Calibrada",
-    CurrentValue = false,
-    Callback = function(state)
-        calibratedAimbotActive = state
-        if state then startCalibratedAimbot() else if calibratedAimbotConn then calibratedAimbotConn:Disconnect(); calibratedAimbotConn = nil end end
-    end,
-})
-
-CombatTab:CreateSection("Silent Aim Calibrado")
-local silentAimCalibrated = false
-
-CombatTab:CreateToggle({
-    Name = "Silent Aim (Mira Calibrada)",
-    CurrentValue = false,
-    Callback = function(state)
-        silentAimCalibrated = state
-        print("Silent Aim calibrado " .. (state and "ativado" or "desativado"))
-    end,
-})
-
-local function setupSilentAimCalibrated()
-    local mouse = player:GetMouse()
-    if not mouse then return end
-    
-    local originalHit = mouse.Hit
-    local metatable = {}
-    metatable.__index = function(t, k)
-        if k == "Hit" and silentAimCalibrated then
-            local target = getTargetNearCalibratedAim()
-            if target and target.Position then
-                local origin = mouse.Origin.Position
-                return CFrame.new(origin, target.Position)
-            end
-        end
-        return mouse[k]
-    end
-    setmetatable(mouse, metatable)
-end
-
-task.spawn(setupSilentAimCalibrated)
-
--- ===== GUIDA DE USO =====
 CombatTab:CreateParagraph({
-    Title = "📖 Como Calibrar a Mira",
-    Content = "1. Ative 'Modo Calibração'\n2. Arraste o ponto vermelho até a MIRA DO JOGO\n3. Ative 'Usar Posição Calibrada'\n4. Ative 'Aimbot na Mira Calibrada'\n\nDica: Use os sliders para ajuste fino."
+    Title = "📖 Como usar",
+    Content = "Ajuste o slider 'Altura da Mira (Y)' até que o aimbot aponte exatamente para onde a mira do jogo está.\n\nValores NEGATIVOS movem a mira para CIMA.\nValores POSITIVOS movem a mira para BAIXO.\n\nDica: no jogo, a mira geralmente está acima do centro, então use valores negativos (ex: -0.08)."
 })
+
+-- ===== REMOVE O CROSSHAIR ANTIGO =====
+-- O crosshair móvel foi substituído por este sistema mais simples e funcional.
 -- ========== NOVA ABA: NOCLIP (COM MINI-HUB) ==========
 local NoClipTab = Window:CreateTab("🎮 NoClip", 4483362458)
 NoClipTab:CreateSection("Mini-Hub Flutuante")
