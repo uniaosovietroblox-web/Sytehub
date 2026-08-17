@@ -1190,388 +1190,8 @@ MusicTab:CreateButton({
         end
     end,
 })
-
--- ========== ABA 4: COMBATE (COM CALIBRAGEM DE OFFSET + CROSSHAIR) ==========
-local CombatTab = Window:CreateTab("⚔️ Combate", 4483362458)
-CombatTab:CreateSection("Aimbot")
-
-local aimbot = {
-    enabled = false,
-    smoothness = 0.25,
-    fov = 120,
-    range = 300,
-    target = "Torso", -- "Torso" ou "Head"
-    wallCheck = false,
-    teamCheck = true,
-    silent = false,
-    prediction = false,
-    predictionAmount = 0.2,
-    showFOV = false,
-    -- OFFSET DA MIRA
-    offsetX = 0,
-    offsetY = -1.5,
-    offsetZ = 0,
-    useAutoOffset = true,
-}
-
-local aimbotConn = nil
-local fovCircle = nil
-
--- ===== DETECÇÃO AUTOMÁTICA DE OFFSET =====
-local function getAutoOffset()
-    local gameName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name or ""
-    local lowerName = string.lower(gameName)
-    
-    local knownOffsets = {
-        ["army"] = Vector3.new(0, -1.5, 0),
-        ["military"] = Vector3.new(0, -1.5, 0),
-        ["combat"] = Vector3.new(0, -1.2, 0),
-        ["arsenal"] = Vector3.new(0, 0, 0),
-        ["phantom"] = Vector3.new(0, -1.8, 0),
-        ["bad business"] = Vector3.new(0, -1.5, 0),
-        ["counter blox"] = Vector3.new(0, -1.5, 0),
-        ["aimblox"] = Vector3.new(0, -1.2, 0),
-        ["typical colors"] = Vector3.new(0, -1.2, 0),
-    }
-    
-    for key, offset in pairs(knownOffsets) do
-        if string.find(lowerName, key) then
-            return offset
-        end
-    end
-    return Vector3.new(0, -1.5, 0)
-end
-
--- ===== VERIFICA TIME =====
-local function isEnemy(target)
-    if not aimbot.teamCheck then return true end
-    local myTeam = player.Team
-    local targetTeam = target.Team
-    if myTeam and targetTeam then
-        return myTeam ~= targetTeam
-    end
-    return true
-end
-
--- ===== WALL CHECK =====
-local function canSee(targetPos)
-    if not aimbot.wallCheck then return true end
-    local cam = Workspace.CurrentCamera
-    local origin = cam.CFrame.Position
-    local ray = Ray.new(origin, (targetPos - origin).Unit * aimbot.range)
-    local hit = Workspace:FindPartOnRayWithIgnoreList(ray, {player.Character, cam})
-    if hit then
-        local dist = (hit.Position - origin).Magnitude
-        return dist > (targetPos - origin).Magnitude - 1
-    end
-    return true
-end
-
--- ===== OBTEM O ALVO COM OFFSET =====
-local function getClosestTarget()
-    local cam = Workspace.CurrentCamera
-    if not cam then return nil end
-    local center = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
-    local closest = nil
-    local closestScore = math.huge
-    local myPos = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    if not myPos then return nil end
-
-    local offset
-    if aimbot.useAutoOffset then
-        offset = getAutoOffset()
-    else
-        offset = Vector3.new(aimbot.offsetX, aimbot.offsetY, aimbot.offsetZ)
-    end
-
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-            if not isEnemy(plr) then continue end
-            
-            local root = plr.Character.HumanoidRootPart
-            local head = plr.Character:FindFirstChild("Head")
-            local targetPos
-            
-            if aimbot.target == "Head" and head then
-                targetPos = head.Position + offset
-            else
-                targetPos = root.Position + offset
-            end
-            
-            if not targetPos then continue end
-
-            if aimbot.prediction then
-                local vel = root.AssemblyLinearVelocity
-                if vel.Magnitude > 1 then
-                    targetPos = targetPos + vel * aimbot.predictionAmount
-                end
-            end
-
-            local dist = (targetPos - myPos.Position).Magnitude
-            if dist > aimbot.range then continue end
-            if not canSee(targetPos) then continue end
-            
-            local screenPos, onScreen = cam:WorldToScreenPoint(targetPos)
-            if onScreen then
-                local fovDist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
-                if fovDist < aimbot.fov then
-                    local score = fovDist + dist * 0.01
-                    if score < closestScore then
-                        closestScore = score
-                        closest = { Position = targetPos }
-                    end
-                end
-            end
-        end
-    end
-    return closest
-end
-
--- ===== INICIA O AIMBOT =====
-local function startAimbot()
-    if aimbotConn then aimbotConn:Disconnect(); aimbotConn = nil end
-    if not aimbot.enabled then return end
-    aimbotConn = RunService.RenderStepped:Connect(function()
-        if not aimbot.enabled then return end
-        local target = getClosestTarget()
-        if target and target.Position then
-            local cam = Workspace.CurrentCamera
-            local targetPos = target.Position
-            local newCF = CFrame.new(cam.CFrame.Position, targetPos)
-            cam.CFrame = cam.CFrame:Lerp(newCF, aimbot.smoothness)
-        end
-    end)
-end
-
--- ===== INTERFACE AIMBOT =====
-CombatTab:CreateToggle({
-    Name = "Aimbot Ativo",
-    CurrentValue = false,
-    Callback = function(state)
-        aimbot.enabled = state
-        if state then startAimbot() else if aimbotConn then aimbotConn:Disconnect(); aimbotConn = nil end end
-    end,
-})
-
-CombatTab:CreateSlider({
-    Name = "Suavidade",
-    Range = {0.05, 0.6},
-    Increment = 0.05,
-    Suffix = "",
-    CurrentValue = 0.25,
-    Callback = function(v) aimbot.smoothness = v end,
-})
-
-CombatTab:CreateSlider({
-    Name = "FOV",
-    Range = {30, 200},
-    Increment = 5,
-    Suffix = "°",
-    CurrentValue = 120,
-    Callback = function(v) aimbot.fov = v end,
-})
-
-CombatTab:CreateSlider({
-    Name = "Alcance",
-    Range = {50, 500},
-    Increment = 10,
-    Suffix = "m",
-    CurrentValue = 300,
-    Callback = function(v) aimbot.range = v end,
-})
-
-CombatTab:CreateDropdown({
-    Name = "Alvo",
-    Options = {"Torso", "Cabeça"},
-    CurrentOption = "Torso",
-    Callback = function(opt) aimbot.target = opt end,
-})
-
-CombatTab:CreateSection("Calibragem da Mira (Offset)")
-
-CombatTab:CreateToggle({
-    Name = "Offset Automático",
-    CurrentValue = true,
-    Callback = function(state)
-        aimbot.useAutoOffset = state
-        if state then
-            print("✅ Offset automático ativado")
-        else
-            print("ℹ️ Use os sliders abaixo para ajustar manualmente")
-        end
-    end,
-})
-
-CombatTab:CreateSlider({
-    Name = "Offset X",
-    Range = {-5, 5},
-    Increment = 0.1,
-    Suffix = "",
-    CurrentValue = 0,
-    Callback = function(v)
-        aimbot.offsetX = v
-        print("🔄 Offset X: " .. v)
-    end,
-})
-
-CombatTab:CreateSlider({
-    Name = "Offset Y (Vertical)",
-    Range = {-5, 5},
-    Increment = 0.1,
-    Suffix = "",
-    CurrentValue = -1.5,
-    Callback = function(v)
-        aimbot.offsetY = v
-        print("🔄 Offset Y: " .. v)
-    end,
-})
-
-CombatTab:CreateSlider({
-    Name = "Offset Z (Profundidade)",
-    Range = {-5, 5},
-    Increment = 0.1,
-    Suffix = "",
-    CurrentValue = 0,
-    Callback = function(v)
-        aimbot.offsetZ = v
-        print("🔄 Offset Z: " .. v)
-    end,
-})
-
-CombatTab:CreateButton({
-    Name = "🔁 Resetar Offset",
-    Callback = function()
-        aimbot.offsetX = 0
-        aimbot.offsetY = -1.5
-        aimbot.offsetZ = 0
-        aimbot.useAutoOffset = true
-        print("✅ Offset resetado para padrão (-1.5 Y, auto-detecção ativada)")
-    end,
-})
-
-CombatTab:CreateSection("Configurações Avançadas")
-
-CombatTab:CreateToggle({
-    Name = "Silent Aim",
-    CurrentValue = false,
-    Callback = function(state) aimbot.silent = state end,
-})
-
-CombatTab:CreateToggle({
-    Name = "Wall Check",
-    CurrentValue = false,
-    Callback = function(state) aimbot.wallCheck = state end,
-})
-
-CombatTab:CreateToggle({
-    Name = "Verificar Time",
-    CurrentValue = true,
-    Callback = function(state) aimbot.teamCheck = state end,
-})
-
-CombatTab:CreateToggle({
-    Name = "Predição (Lead)",
-    CurrentValue = false,
-    Callback = function(state) aimbot.prediction = state end,
-})
-
-CombatTab:CreateSlider({
-    Name = "Fator de Predição",
-    Range = {0.05, 0.5},
-    Increment = 0.05,
-    Suffix = "",
-    CurrentValue = 0.2,
-    Callback = function(v) aimbot.predictionAmount = v end,
-})
-
-CombatTab:CreateToggle({
-    Name = "Mostrar FOV Circle",
-    CurrentValue = false,
-    Callback = function(state)
-        aimbot.showFOV = state
-        if state then
-            if not fovCircle then
-                fovCircle = Drawing.new("Circle")
-                fovCircle.Visible = true
-                fovCircle.Radius = aimbot.fov
-                fovCircle.Thickness = 1
-                fovCircle.Color = Color3.fromRGB(255, 255, 255)
-                fovCircle.Filled = false
-                fovCircle.NumSides = 32
-                fovCircle.Position = Vector2.new(Workspace.CurrentCamera.ViewportSize.X / 2, Workspace.CurrentCamera.ViewportSize.Y / 2)
-            end
-        else
-            if fovCircle then fovCircle.Visible = false; fovCircle = nil end
-        end
-    end,
-})
-
-RunService.RenderStepped:Connect(function()
-    if aimbot.showFOV and fovCircle then
-        local cam = Workspace.CurrentCamera
-        fovCircle.Position = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
-        fovCircle.Radius = aimbot.fov
-        fovCircle.Visible = true
-    elseif fovCircle then
-        fovCircle.Visible = false
-    end
-end)
-
--- ===== WALL HACK =====
-CombatTab:CreateSection("Wall Hack")
-local wallhackActive = false
-local wallhackESP = {}
-
-CombatTab:CreateToggle({
-    Name = "Wall Hack (ESP)",
-    CurrentValue = false,
-    Callback = function(state)
-        wallhackActive = state
-        if state then
-            local function addESP(plr)
-                if plr == player or wallhackESP[plr] then return end
-                local function createESP(char)
-                    task.wait(0.3)
-                    if not wallhackActive or not char.Parent then return end
-                    local head = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
-                    if not head then return end
-                    local bill = Instance.new("BillboardGui")
-                    bill.Size = UDim2.new(0, 100, 0, 30)
-                    bill.Adornee = head
-                    bill.AlwaysOnTop = true
-                    bill.Parent = char
-                    local lbl = Instance.new("TextLabel")
-                    lbl.Size = UDim2.new(1, 0, 1, 0)
-                    lbl.BackgroundTransparency = 1
-                    lbl.Text = plr.Name
-                    lbl.TextColor3 = Color3.fromRGB(255, 80, 80)
-                    lbl.TextSize = 14
-                    lbl.Font = Enum.Font.GothamBold
-                    lbl.TextStrokeTransparency = 0.3
-                    lbl.Parent = bill
-                    wallhackESP[plr] = bill
-                end
-                plr.CharacterAdded:Connect(createESP)
-                if plr.Character then createESP(plr.Character) end
-            end
-            for _, plr in ipairs(Players:GetPlayers()) do addESP(plr) end
-            local conn1 = Players.PlayerAdded:Connect(addESP)
-            local conn2 = Players.PlayerRemoving:Connect(function(p)
-                if wallhackESP[p] then wallhackESP[p]:Destroy(); wallhackESP[p] = nil end
-            end)
-            _G.Syte_WH_1 = conn1
-            _G.Syte_WH_2 = conn2
-        else
-            for _, bill in pairs(wallhackESP) do if bill then bill:Destroy() end end
-            wallhackESP = {}
-            if _G.Syte_WH_1 then _G.Syte_WH_1:Disconnect() end
-            if _G.Syte_WH_2 then _G.Syte_WH_2:Disconnect() end
-        end
-    end,
-})
-
--- ===== CROSSHAIR & SILENT AIM (FUNCIONAL) =====
-CombatTab:CreateSection("Crosshair & Silent Aim")
+-- ===== CROSSHAIR (AIMBOT COM MIRA MÓVEL) =====
+CombatTab:CreateSection("Crosshair Móvel (Aimbot)")
 
 local crosshair = {
     enabled = false,
@@ -1580,7 +1200,7 @@ local crosshair = {
     size = 20,
     color = Color3.fromRGB(255, 0, 0),
     thickness = 2,
-    hitboxRadius = 40,
+    hitboxRadius = 50,
     silentAim = false,
     autoFire = false,
     showHitbox = false,
@@ -1592,7 +1212,7 @@ local crosshairFrame = nil
 local hitboxCircle = nil
 local isDraggingCrosshair = false
 
--- ===== CRIA O CROSSHAIR =====
+-- ===== CRIA O CROSSHAIR (MIRA MÓVEL) =====
 local function createCrosshair()
     if crosshairGui then crosshairGui:Destroy() end
     
@@ -1702,7 +1322,6 @@ local function createCrosshair()
     crosshairGui.Enabled = true
 end
 
--- ===== ATUALIZA O CROSSHAIR =====
 local function updateCrosshair()
     if not crosshairGui or not crosshairFrame then return end
     for _, child in ipairs(crosshairFrame:GetChildren()) do
@@ -1752,7 +1371,6 @@ local function getTargetUnderCrosshair()
             local head = plr.Character:FindFirstChild("Head")
             local targetPos = root.Position
             
-            -- Usa o mesmo offset do aimbot para consistência
             local offset
             if aimbot.useAutoOffset then
                 offset = getAutoOffset()
@@ -1761,7 +1379,6 @@ local function getTargetUnderCrosshair()
             end
             targetPos = targetPos + offset
             
-            -- Verifica também a cabeça e torso para melhor detecção
             local parts = {}
             if head then parts[#parts+1] = head end
             parts[#parts+1] = root
@@ -1785,8 +1402,8 @@ local function getTargetUnderCrosshair()
     return closest
 end
 
--- ===== APLICA DANO AO ALVO (GARANTIDO) =====
-local function applyDamageToTarget(target)
+-- ===== SIMULA UM TIRO COMPLETO =====
+local function fireShot(target)
     if not target or not target.Character then return end
     local targetHumanoid = target.Character:FindFirstChild("Humanoid")
     if not targetHumanoid then return end
@@ -1794,16 +1411,33 @@ local function applyDamageToTarget(target)
     local char = player.Character
     if not char then return end
     
-    -- MÉTODO 1: Tenta usar a ferramenta equipada
+    -- 1. Simula clique do mouse (ativa animações, sons, etc.)
+    local mouse = player:GetMouse()
+    if mouse then
+        pcall(function()
+            if mouse.Button1Down then
+                mouse.Button1Down()
+            end
+        end)
+    end
+    
+    -- 2. Tenta ativar a ferramenta diretamente
     local tool = char:FindFirstChildOfClass("Tool")
     if tool then
-        -- Tenta ativar a ferramenta (simula o clique)
         pcall(function()
             if tool.Activated then
                 tool:Activated()
             end
         end)
-        -- Tenta enviar RemoteEvent se existir
+    end
+    
+    -- 3. Aplica dano diretamente (para garantir)
+    pcall(function()
+        targetHumanoid:TakeDamage(crosshair.damageAmount)
+    end)
+    
+    -- 4. Tenta RemoteEvents
+    if tool then
         pcall(function()
             if tool:FindFirstChild("RemoteEvent") then
                 tool.RemoteEvent:FireServer(targetHumanoid)
@@ -1813,29 +1447,6 @@ local function applyDamageToTarget(target)
             end
         end)
     end
-    
-    -- MÉTODO 2: Dano direto no Humanoid (funciona na maioria dos jogos)
-    pcall(function()
-        targetHumanoid:TakeDamage(crosshair.damageAmount)
-        print("💥 Dano aplicado em " .. target.Name .. " (" .. crosshair.damageAmount .. ")")
-    end)
-    
-    -- MÉTODO 3: Tenta usar o mouse para atirar (fallback)
-    pcall(function()
-        local mouse = player:GetMouse()
-        if mouse and mouse.Button1Down then
-            mouse.Button1Down()
-        end
-    end)
-    
-    -- MÉTODO 4: Tenta usar fireproximityprompt (para jogos com prompts)
-    pcall(function()
-        for _, obj in ipairs(target.Character:GetDescendants()) do
-            if obj:IsA("ProximityPrompt") then
-                fireproximityprompt(obj)
-            end
-        end
-    end)
 end
 
 -- ===== INTERFACE =====
@@ -1966,7 +1577,7 @@ CombatTab:CreateToggle({
                 if not crosshair.enabled or not crosshair.autoFire then return end
                 local target = getTargetUnderCrosshair()
                 if target then
-                    applyDamageToTarget(target)
+                    fireShot(target)
                 end
             end)
             print("✅ Auto Fire contínuo ativado")
@@ -1977,7 +1588,7 @@ CombatTab:CreateToggle({
     end,
 })
 
--- ===== SILENT AIM (INTERCEPTA O CLIQUE) =====
+-- ===== SILENT AIM =====
 local originalMouseButton1Down = nil
 local silentAimConn = nil
 
@@ -1995,11 +1606,9 @@ local function setupSilentAim()
             if crosshair.enabled and crosshair.silentAim then
                 local target = getTargetUnderCrosshair()
                 if target then
-                    print("🎯 Silent Aim: alvo encontrado - " .. target.Name)
-                    applyDamageToTarget(target)
-                    return -- Bloqueia o clique normal
-                else
-                    print("Silent Aim: nenhum alvo sob o crosshair")
+                    print("🎯 Silent Aim: alvo - " .. target.Name)
+                    fireShot(target)
+                    return
                 end
             end
             if originalMouseButton1Down then
@@ -2022,12 +1631,12 @@ end)
 -- ===== BOTÃO DE TESTE =====
 CombatTab:CreateSection("Diagnóstico")
 CombatTab:CreateButton({
-    Name = "🔍 Testar Detecção e Dano",
+    Name = "🔍 Testar Detecção e Tiro",
     Callback = function()
         local target = getTargetUnderCrosshair()
         if target then
-            print("✅ Alvo detectado: " .. target.Name)
-            applyDamageToTarget(target)
+            print("✅ Alvo: " .. target.Name)
+            fireShot(target)
         else
             print("❌ Nenhum alvo sob o crosshair")
         end
