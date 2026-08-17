@@ -1608,95 +1608,88 @@ CombatTab:CreateToggle({
     end,
 })
 
--- ===== AJUSTE DA MIRA (OFFSET VERTICAL) =====
-CombatTab:CreateSection("Ajuste da Mira")
+-- ===== SILENT AIM UNIVERSAL =====
+CombatTab:CreateSection("Silent Aim Universal")
 
-local aimOffsetY = -0.08 -- valor em porcentagem da tela (negativo = para cima)
+local silentAimUniversalEnabled = false
+local silentAimToggle = nil
 
--- Slider para ajustar a altura da mira
-CombatTab:CreateSlider({
-    Name = "Altura da Mira (Y)",
-    Range = {-0.25, 0.25},
-    Increment = 0.005,
-    Suffix = "",
-    CurrentValue = aimOffsetY,
-    Callback = function(v)
-        aimOffsetY = v
-        print("🔄 Altura da mira ajustada para: " .. string.format("%.3f", v))
-    end,
-})
-
--- Botão para resetar
-CombatTab:CreateButton({
-    Name = "🔄 Resetar para Centro",
-    Callback = function()
-        aimOffsetY = 0
-        print("✅ Mira resetada para o centro")
-    end,
-})
-
--- Função que retorna a posição da mira (centro + offset Y)
-local function getAimPosition()
-    local cam = Workspace.CurrentCamera
-    if not cam then return Vector2.new(0, 0) end
-    local center = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
-    return Vector2.new(center.X, center.Y + (aimOffsetY * cam.ViewportSize.Y))
-end
-
--- ===== MODIFICA A FUNÇÃO getClosestTarget PARA USAR A POSIÇÃO AJUSTADA =====
--- Salva a função original
-local originalGetClosestTarget = getClosestTarget
-
--- Sobrescreve a função getClosestTarget
-getClosestTarget = function()
-    local cam = Workspace.CurrentCamera
-    if not cam then return nil end
-    local aimPos = getAimPosition()
-    local closest = nil
-    local closestScore = math.huge
-    local myPos = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    if not myPos then return nil end
-
-    local offset
-    if aimbot.useAutoOffset then
-        offset = getAutoOffset()
-    else
-        offset = Vector3.new(aimbot.offsetX, aimbot.offsetY, aimbot.offsetZ)
-    end
-
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-            if not isEnemy(plr) then continue end
-            local root = plr.Character.HumanoidRootPart
-            local head = plr.Character:FindFirstChild("Head")
-            local targetPos = root.Position + offset
-
-            local screenPos, onScreen = cam:WorldToScreenPoint(targetPos)
-            if onScreen then
-                local dist = (Vector2.new(screenPos.X, screenPos.Y) - aimPos).Magnitude
-                if dist < aimbot.fov then
-                    local score = dist + (targetPos - myPos.Position).Magnitude * 0.01
-                    if score < closestScore then
-                        closestScore = score
-                        closest = { Position = targetPos }
-                    end
+-- Função para carregar e iniciar o Silent Aim Universal
+local function loadUniversalSilentAim()
+    if silentAimUniversalEnabled then
+        -- Carrega o script do GitHub (fonte original e confiável)
+        local success, err = pcall(function()
+            loadstring(game:HttpGet('https://raw.githubusercontent.com/Averiias/Universal-SilentAim/main/main.lua'))()
+        end)
+        if success then
+            print("✅ Silent Aim Universal carregado com sucesso!")
+            -- Ativa o Silent Aim por padrão após o carregamento
+            pcall(function()
+                getgenv().SilentAimSettings.Enabled = true
+            end)
+            -- Tenta abrir o menu do Silent Aim (tecla padrão: RightAlt)
+            pcall(function()
+                -- Simula a pressão da tecla para abrir o menu, se disponível
+                -- Nota: isso pode não funcionar em todos os executors, mas é uma tentativa.
+                local VirtualInputManager = game:GetService("VirtualInputManager")
+                if VirtualInputManager then
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.RightAlt, false, game)
+                    task.wait(0.1)
+                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.RightAlt, false, game)
                 end
-            end
+            end)
+        else
+            warn("❌ Erro ao carregar Silent Aim Universal: " .. tostring(err))
         end
     end
-    return closest
 end
 
--- ===== SILENT AIM TAMBÉM USA A POSIÇÃO AJUSTADA =====
--- O silent aim já usa a função getClosestTarget, então automaticamente herdará a mudança
-
-CombatTab:CreateParagraph({
-    Title = "📖 Como usar",
-    Content = "Ajuste o slider 'Altura da Mira (Y)' até que o aimbot aponte exatamente para onde a mira do jogo está.\n\nValores NEGATIVOS movem a mira para CIMA.\nValores POSITIVOS movem a mira para BAIXO.\n\nDica: no jogo, a mira geralmente está acima do centro, então use valores negativos (ex: -0.08)."
+-- Cria o toggle para ativar o Silent Aim
+CombatTab:CreateToggle({
+    Name = "Ativar Silent Aim Universal",
+    CurrentValue = false,
+    Callback = function(state)
+        silentAimUniversalEnabled = state
+        if state then
+            loadUniversalSilentAim()
+        else
+            -- Tenta desativar via configurações globais
+            pcall(function()
+                if getgenv().SilentAimSettings then
+                    getgenv().SilentAimSettings.Enabled = false
+                end
+            end)
+            print("Silent Aim Universal desativado.")
+        end
+    end,
 })
 
--- ===== REMOVE O CROSSHAIR ANTIGO =====
--- O crosshair móvel foi substituído por este sistema mais simples e funcional.
+-- Adiciona um botão para abrir o menu de configuração do Silent Aim
+CombatTab:CreateButton({
+    Name = "⚙️ Abrir Menu do Silent Aim",
+    Callback = function()
+        pcall(function()
+            if getgenv().SilentAimSettings then
+                -- Tenta abrir o menu (a tecla padrão é RightAlt)
+                local VirtualInputManager = game:GetService("VirtualInputManager")
+                if VirtualInputManager then
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.RightAlt, false, game)
+                    task.wait(0.1)
+                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.RightAlt, false, game)
+                else
+                    print("⚠️ VirtualInputManager não disponível. Tente pressionar a tecla 'RightAlt' manualmente.")
+                end
+            else
+                print("⚠️ Silent Aim não está ativo. Ative-o primeiro.")
+            end
+        end)
+    end,
+})
+
+CombatTab:CreateParagraph({
+    Title = "📖 Como Usar",
+    Content = "1. Ative o 'Silent Aim Universal'.\n2. O menu do Silent Aim abrirá automaticamente.\n3. Você pode ajustar FOV, Suavidade, e outras opções.\n4. Se o menu não abrir, pressione a tecla 'RightAlt' (Alt Direito) no seu teclado.\n\nO script é universal e funciona na maioria dos jogos com raycasting."
+})
 -- ========== NOVA ABA: NOCLIP (COM MINI-HUB) ==========
 local NoClipTab = Window:CreateTab("🎮 NoClip", 4483362458)
 NoClipTab:CreateSection("Mini-Hub Flutuante")
