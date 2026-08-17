@@ -961,7 +961,7 @@ task.spawn(function()
     updateUI()
 end)
 
--- ========== ABA 2: ESP (COM CORES POR TIME - VERSÃO COMPATÍVEL) ==========
+-- ========== ABA 2: ESP (COM CORES POR TIME - SEM COLORPICKER) ==========
 local EspTab = Window:CreateTab("👁️ ESP", 4483362458)
 EspTab:CreateSection("Configurações do ESP")
 
@@ -1204,7 +1204,6 @@ EspTab:CreateToggle({ Name = "Caixas / Highlight", CurrentValue = false, Callbac
 EspTab:CreateToggle({ Name = "Linhas (ESP Lines)", CurrentValue = false, Callback = function(v) ESP.Lines = v end })
 EspTab:CreateToggle({ Name = "Mostrar Nomes", CurrentValue = false, Callback = function(v) ESP.Names = v end })
 EspTab:CreateToggle({ Name = "Mostrar Distância", CurrentValue = false, Callback = function(v) ESP.Distance = v end })
-
 -- ========== ABA 3: RÁDIO ==========
 local MusicTab = Window:CreateTab("🎵 Rádio", 4483362458)
 MusicTab:CreateSection("Tocador de Música")
