@@ -1191,7 +1191,7 @@ MusicTab:CreateButton({
     end,
 })
 
--- ========== ABA 4: COMBATE (COM CALIBRAGEM DE OFFSET) ==========
+-- ========== ABA 4: COMBATE (COM CALIBRAGEM DE OFFSET + CROSSHAIR) ==========
 local CombatTab = Window:CreateTab("⚔️ Combate", 4483362458)
 CombatTab:CreateSection("Aimbot")
 
@@ -1209,9 +1209,9 @@ local aimbot = {
     showFOV = false,
     -- OFFSET DA MIRA
     offsetX = 0,
-    offsetY = -1.5, -- padrão para a maioria dos jogos
+    offsetY = -1.5,
     offsetZ = 0,
-    useAutoOffset = true, -- detecta automaticamente pelo nome do jogo
+    useAutoOffset = true,
 }
 
 local aimbotConn = nil
@@ -1239,7 +1239,7 @@ local function getAutoOffset()
             return offset
         end
     end
-    return Vector3.new(0, -1.5, 0) -- padrão
+    return Vector3.new(0, -1.5, 0)
 end
 
 -- ===== VERIFICA TIME =====
@@ -1277,7 +1277,6 @@ local function getClosestTarget()
     local myPos = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     if not myPos then return nil end
 
-    -- Calcula o offset atual
     local offset
     if aimbot.useAutoOffset then
         offset = getAutoOffset()
@@ -1301,7 +1300,6 @@ local function getClosestTarget()
             
             if not targetPos then continue end
 
-            -- Predição
             if aimbot.prediction then
                 local vel = root.AssemblyLinearVelocity
                 if vel.Magnitude > 1 then
@@ -1345,7 +1343,7 @@ local function startAimbot()
     end)
 end
 
--- ===== INTERFACE =====
+-- ===== INTERFACE AIMBOT =====
 CombatTab:CreateToggle({
     Name = "Aimbot Ativo",
     CurrentValue = false,
@@ -1508,7 +1506,6 @@ CombatTab:CreateToggle({
     end,
 })
 
--- Atualiza o círculo de FOV
 RunService.RenderStepped:Connect(function()
     if aimbot.showFOV and fovCircle then
         local cam = Workspace.CurrentCamera
@@ -1573,6 +1570,402 @@ CombatTab:CreateToggle({
     end,
 })
 
+-- ===== CROSSHAIR & SILENT AIM INDEPENDENTE =====
+CombatTab:CreateSection("Crosshair & Silent Aim")
+
+local crosshair = {
+    enabled = false,
+    x = 0.5,
+    y = 0.5,
+    size = 20,
+    color = Color3.fromRGB(255, 0, 0),
+    thickness = 2,
+    hitboxRadius = 30,
+    silentAim = false,
+    autoFire = false,
+    showHitbox = false,
+}
+
+local crosshairGui = nil
+local crosshairFrame = nil
+local hitboxCircle = nil
+local isDraggingCrosshair = false
+
+local function createCrosshair()
+    if crosshairGui then crosshairGui:Destroy() end
+    
+    crosshairGui = Instance.new("ScreenGui")
+    crosshairGui.Name = "Syte_Crosshair"
+    crosshairGui.ResetOnSpawn = false
+    crosshairGui.IgnoreGuiInset = true
+    crosshairGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    pcall(function()
+        if gethui then
+            crosshairGui.Parent = gethui()
+        else
+            crosshairGui.Parent = CoreGui
+        end
+    end)
+    if not crosshairGui.Parent then
+        crosshairGui.Parent = player:WaitForChild("PlayerGui")
+    end
+    crosshairGui.Enabled = false
+
+    crosshairFrame = Instance.new("Frame")
+    crosshairFrame.Size = UDim2.new(0, 60, 0, 60)
+    crosshairFrame.Position = UDim2.new(crosshair.x - 0.03, 0, crosshair.y - 0.03, 0)
+    crosshairFrame.BackgroundTransparency = 1
+    crosshairFrame.Parent = crosshairGui
+    crosshairFrame.Active = true
+    crosshairFrame.Draggable = false
+    crosshairFrame.ZIndex = 10
+
+    local hLine = Instance.new("Frame")
+    hLine.Size = UDim2.new(0, crosshair.size, 0, crosshair.thickness)
+    hLine.Position = UDim2.new(0.5, -crosshair.size/2, 0.5, -crosshair.thickness/2)
+    hLine.BackgroundColor3 = crosshair.color
+    hLine.BorderSizePixel = 0
+    hLine.BackgroundTransparency = 0.2
+    hLine.Parent = crosshairFrame
+    hLine.ZIndex = 11
+
+    local vLine = Instance.new("Frame")
+    vLine.Size = UDim2.new(0, crosshair.thickness, 0, crosshair.size)
+    vLine.Position = UDim2.new(0.5, -crosshair.thickness/2, 0.5, -crosshair.size/2)
+    vLine.BackgroundColor3 = crosshair.color
+    vLine.BorderSizePixel = 0
+    vLine.BackgroundTransparency = 0.2
+    vLine.Parent = crosshairFrame
+    vLine.ZIndex = 11
+
+    local dot = Instance.new("Frame")
+    dot.Size = UDim2.new(0, 4, 0, 4)
+    dot.Position = UDim2.new(0.5, -2, 0.5, -2)
+    dot.BackgroundColor3 = crosshair.color
+    dot.BorderSizePixel = 0
+    dot.BackgroundTransparency = 0.3
+    dot.Parent = crosshairFrame
+    dot.ZIndex = 12
+    Instance.new("UICorner", dot).CornerRadius = UDim.new(0, 2)
+
+    hitboxCircle = Instance.new("Frame")
+    hitboxCircle.Size = UDim2.new(0, crosshair.hitboxRadius * 2, 0, crosshair.hitboxRadius * 2)
+    hitboxCircle.Position = UDim2.new(0.5, -crosshair.hitboxRadius, 0.5, -crosshair.hitboxRadius)
+    hitboxCircle.BackgroundColor3 = crosshair.color
+    hitboxCircle.BackgroundTransparency = 0.85
+    hitboxCircle.BorderSizePixel = 1
+    hitboxCircle.BorderColor3 = crosshair.color
+    hitboxCircle.Parent = crosshairFrame
+    hitboxCircle.ZIndex = 9
+    Instance.new("UICorner", hitboxCircle).CornerRadius = UDim.new(0, crosshair.hitboxRadius)
+    hitboxCircle.Visible = crosshair.showHitbox
+
+    local function startDrag(input)
+        isDraggingCrosshair = true
+        local startPos = input.Position
+        local framePos = crosshairFrame.Position
+        
+        local dragConn
+        dragConn = UserInputService.InputChanged:Connect(function(input2)
+            if input2.UserInputType == Enum.UserInputType.MouseMovement or input2.UserInputType == Enum.UserInputType.Touch then
+                if isDraggingCrosshair then
+                    local delta = input2.Position - startPos
+                    local newX = framePos.X.Scale + (delta.X / crosshairGui.AbsoluteSize.X)
+                    local newY = framePos.Y.Scale + (delta.Y / crosshairGui.AbsoluteSize.Y)
+                    newX = math.clamp(newX, 0, 1 - 0.06)
+                    newY = math.clamp(newY, 0, 1 - 0.06)
+                    crosshairFrame.Position = UDim2.new(newX, 0, newY, 0)
+                    crosshair.x = newX + 0.03
+                    crosshair.y = newY + 0.03
+                end
+            end
+        end)
+        
+        local endConn
+        endConn = UserInputService.InputEnded:Connect(function(input2)
+            if input2 == input then
+                isDraggingCrosshair = false
+                dragConn:Disconnect()
+                endConn:Disconnect()
+            end
+        end)
+    end
+
+    crosshairFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            startDrag(input)
+        end
+    end)
+
+    crosshairGui.Enabled = true
+end
+
+local function updateCrosshair()
+    if not crosshairGui or not crosshairFrame then return end
+    for _, child in ipairs(crosshairFrame:GetChildren()) do
+        if child:IsA("Frame") and child ~= hitboxCircle then
+            child.BackgroundColor3 = crosshair.color
+        end
+    end
+    if hitboxCircle then
+        hitboxCircle.BackgroundColor3 = crosshair.color
+        hitboxCircle.BorderColor3 = crosshair.color
+        hitboxCircle.Size = UDim2.new(0, crosshair.hitboxRadius * 2, 0, crosshair.hitboxRadius * 2)
+        hitboxCircle.Position = UDim2.new(0.5, -crosshair.hitboxRadius, 0.5, -crosshair.hitboxRadius)
+        hitboxCircle.Visible = crosshair.showHitbox
+    end
+    for _, child in ipairs(crosshairFrame:GetChildren()) do
+        if child:IsA("Frame") and child ~= hitboxCircle and child.Size.X.Offset == crosshair.size then
+            child.Size = UDim2.new(0, crosshair.size, 0, crosshair.thickness)
+            child.Position = UDim2.new(0.5, -crosshair.size/2, 0.5, -crosshair.thickness/2)
+        elseif child:IsA("Frame") and child ~= hitboxCircle and child.Size.Y.Offset == crosshair.size then
+            child.Size = UDim2.new(0, crosshair.thickness, 0, crosshair.size)
+            child.Position = UDim2.new(0.5, -crosshair.thickness/2, 0.5, -crosshair.size/2)
+        end
+    end
+end
+
+local function getTargetUnderCrosshair()
+    if not crosshairGui or not crosshairFrame then return nil end
+    local cam = Workspace.CurrentCamera
+    if not cam then return nil end
+    
+    local viewportSize = cam.ViewportSize
+    local crosshairPos = Vector2.new(
+        crosshair.x * viewportSize.X,
+        crosshair.y * viewportSize.Y
+    )
+    
+    local closest = nil
+    local closestDist = math.huge
+    local myPos = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if not myPos then return nil end
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            if not isEnemy(plr) then continue end
+            local root = plr.Character.HumanoidRootPart
+            local head = plr.Character:FindFirstChild("Head")
+            local targetPos = root.Position
+            
+            local offset
+            if aimbot.useAutoOffset then
+                offset = getAutoOffset()
+            else
+                offset = Vector3.new(aimbot.offsetX, aimbot.offsetY, aimbot.offsetZ)
+            end
+            targetPos = targetPos + offset
+            
+            local screenPos, onScreen = cam:WorldToScreenPoint(targetPos)
+            if onScreen then
+                local dist = (Vector2.new(screenPos.X, screenPos.Y) - crosshairPos).Magnitude
+                if dist < crosshair.hitboxRadius and dist < closestDist then
+                    closestDist = dist
+                    closest = plr
+                end
+            end
+        end
+    end
+    return closest
+end
+
+local function applyDamageToTarget(target)
+    if not target or not target.Character then return end
+    local targetHumanoid = target.Character:FindFirstChild("Humanoid")
+    if not targetHumanoid then return end
+    
+    local char = player.Character
+    if not char then return end
+    
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool then
+        pcall(function()
+            if tool:FindFirstChild("Handle") then
+                local handle = tool.Handle
+                if handle:FindFirstChild("RemoteEvent") then
+                    handle.RemoteEvent:FireServer(targetHumanoid)
+                end
+            end
+            if tool:FindFirstChild("RemoteEvent") then
+                tool.RemoteEvent:FireServer(targetHumanoid)
+            end
+            if tool:FindFirstChild("RemoteFunction") then
+                tool.RemoteFunction:InvokeServer(targetHumanoid)
+            end
+            if tool.Activated then
+                tool:Activated()
+            end
+        end)
+    else
+        pcall(function()
+            targetHumanoid:TakeDamage(20)
+        end)
+    end
+end
+
+-- INTERFACE CROSSHAIR
+CombatTab:CreateToggle({
+    Name = "Ativar Crosshair",
+    CurrentValue = false,
+    Callback = function(state)
+        crosshair.enabled = state
+        if state then
+            createCrosshair()
+        else
+            if crosshairGui then crosshairGui:Destroy(); crosshairGui = nil end
+            crosshairFrame = nil
+            hitboxCircle = nil
+        end
+    end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Mostrar Hitbox Circle",
+    CurrentValue = false,
+    Callback = function(state)
+        crosshair.showHitbox = state
+        if crosshairGui then updateCrosshair() end
+    end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Tamanho do Crosshair",
+    Range = {10, 50},
+    Increment = 1,
+    Suffix = "",
+    CurrentValue = 20,
+    Callback = function(v)
+        crosshair.size = v
+        if crosshairGui then updateCrosshair() end
+    end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Raio do Hitbox",
+    Range = {10, 100},
+    Increment = 1,
+    Suffix = "px",
+    CurrentValue = 30,
+    Callback = function(v)
+        crosshair.hitboxRadius = v
+        if crosshairGui then updateCrosshair() end
+    end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Posição X do Crosshair",
+    Range = {0.05, 0.95},
+    Increment = 0.01,
+    Suffix = "",
+    CurrentValue = 0.5,
+    Callback = function(v)
+        crosshair.x = v
+        if crosshairFrame then
+            crosshairFrame.Position = UDim2.new(v - 0.03, 0, crosshair.y - 0.03, 0)
+        end
+    end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Posição Y do Crosshair",
+    Range = {0.05, 0.95},
+    Increment = 0.01,
+    Suffix = "",
+    CurrentValue = 0.5,
+    Callback = function(v)
+        crosshair.y = v
+        if crosshairFrame then
+            crosshairFrame.Position = UDim2.new(crosshair.x - 0.03, 0, v - 0.03, 0)
+        end
+    end,
+})
+
+CombatTab:CreateButton({
+    Name = "🔄 Resetar Posição do Crosshair",
+    Callback = function()
+        crosshair.x = 0.5
+        crosshair.y = 0.5
+        if crosshairFrame then
+            crosshairFrame.Position = UDim2.new(0.47, 0, 0.47, 0)
+        end
+    end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Silent Aim (Crosshair)",
+    CurrentValue = false,
+    Callback = function(state)
+        crosshair.silentAim = state
+    end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Auto Fire (atira automaticamente)",
+    CurrentValue = false,
+    Callback = function(state)
+        crosshair.autoFire = state
+    end,
+})
+
+local autoFireConn = nil
+
+CombatTab:CreateToggle({
+    Name = "Ativar Auto Fire",
+    CurrentValue = false,
+    Callback = function(state)
+        if state then
+            if autoFireConn then autoFireConn:Disconnect() end
+            autoFireConn = RunService.Heartbeat:Connect(function()
+                if not crosshair.enabled or not crosshair.autoFire then return end
+                local target = getTargetUnderCrosshair()
+                if target then
+                    applyDamageToTarget(target)
+                end
+            end)
+        else
+            if autoFireConn then autoFireConn:Disconnect(); autoFireConn = nil end
+        end
+    end,
+})
+
+local originalMouseButton1Down = nil
+local silentAimConn = nil
+
+local function setupSilentAim()
+    local mouse = player:GetMouse()
+    if mouse then
+        originalMouseButton1Down = mouse.Button1Down
+    end
+    
+    if silentAimConn then silentAimConn:Disconnect(); silentAimConn = nil end
+    
+    silentAimConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            if crosshair.enabled and crosshair.silentAim then
+                local target = getTargetUnderCrosshair()
+                if target then
+                    applyDamageToTarget(target)
+                    return
+                end
+            end
+            if originalMouseButton1Down then
+                originalMouseButton1Down(input)
+            end
+        end
+    end)
+end
+
+task.spawn(setupSilentAim)
+
+pcall(function()
+    if _G.Syte_SilentAimConn then
+        _G.Syte_SilentAimConn:Disconnect()
+        _G.Syte_SilentAimConn = nil
+    end
+    _G.Syte_SilentAimConn = silentAimConn
+end)
+
 -- ========== NOVA ABA: NOCLIP (COM MINI-HUB) ==========
 local NoClipTab = Window:CreateTab("🎮 NoClip", 4483362458)
 NoClipTab:CreateSection("Mini-Hub Flutuante")
@@ -1587,7 +1980,6 @@ local noClipHubToggle = NoClipTab:CreateToggle({
     end,
 })
 
--- Criar mini-hub NoClip
 task.spawn(function()
     if CoreGui:FindFirstChild("Syte_NoClipHub") then
         CoreGui.Syte_NoClipHub:Destroy()
@@ -1713,7 +2105,6 @@ task.spawn(function()
         end
     end)
 
-    -- Arrastar
     local dragging, dragInput, dragStart, startPos
     hub.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
